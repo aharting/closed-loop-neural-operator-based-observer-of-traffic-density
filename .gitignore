@@ -1,0 +1,11 @@
+*.npy
+*.png
+*.pt
+*.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+*.pyc
+__pycache__/
+*.csv
+images_for_inkscape
+*.pdf
+playground.ipynb
