@@ -1,8 +1,8 @@
 main_dir: ''
 data:
   name: 'closedloop_report'
-  train_data_dir: "data/train"
-  test_data_dir: "data/test_minimal"
+  images_data_dir: "data/test_report"
+  test_data_dir: "data/test" 
   ood_test_data_dirs: {} #{"OOD":"data/test_ood"}
   scaled_solution: True
   T_in: 10

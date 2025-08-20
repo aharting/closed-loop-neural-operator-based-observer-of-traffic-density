@@ -106,7 +106,7 @@ def gpr(sensor_x, sensor_ys, all_x, sample=False, n_samples=1):
     sensor_x = sensor_x.cpu().numpy()
     sensor_ys = sensor_ys.cpu().numpy()
     all_x = all_x.cpu().numpy()
-    kernel = None #ConstantKernel(1.0, constant_value_bounds="fixed") * RBF(1.0, length_scale_bounds="fixed") + WhiteKernel()
+    kernel = None # ConstantKernel(1.0, constant_value_bounds="fixed") * RBF(1.0, length_scale_bounds="fixed") + WhiteKernel()
     gpr = GaussianProcessRegressor(kernel=kernel, random_state=0).fit(sensor_x, sensor_ys)
     if sample:
         pred = gpr.sample_y(all_x, n_samples=n_samples)
@@ -120,32 +120,6 @@ def gpr(sensor_x, sensor_ys, all_x, sample=False, n_samples=1):
         pred = np.transpose(pred, (2, 0, 1))
         std = np.transpose(std, (2, 0, 1))
         return pred, std
-
-def old_gpr(sensor_x, sensor_ys, all_x, sample=False, n_samples=1):
-    pred = []
-    stds = []
-    out_dim = sensor_ys.shape[1]
-    for i in range(out_dim):
-        sensor_y = sensor_ys[:, [i]]
-        gpr = GaussianProcessRegressor(kernel=None, random_state=0).fit(sensor_x, sensor_y)
-        if sample:
-            _pred = gpr.sample_y(all_x, n_samples=n_samples)
-        else:
-            _pred, _std = gpr.predict(all_x, return_std=True)
-            _pred = np.expand_dims(_pred, axis=-1)
-            _std = np.expand_dims(_std, axis=-1)
-            stds.append(_std)
-        pred.append(_pred)
-    if sample:
-        pred = np.array(pred)
-        pred = np.transpose(pred, (2, 1, 0))
-        return pred, None
-    else:
-        pred = np.array(pred)
-        pred = np.transpose(pred, (2, 1, 0))
-        stds = np.array(stds)
-        stds = np.transpose(stds, (2, 1, 0))
-        return pred, stds
         
 def gpr_ics(Xs, N_sensors, sample=False, n_samples=1, disable=True):
     # GP sample interpolation of Xs
@@ -159,7 +133,7 @@ def gpr_ics(Xs, N_sensors, sample=False, n_samples=1, disable=True):
     for datapoint in tqdm(range(Xs.shape[0]), disable=disable):
         sensor_xind = np.array([int(x) for x in np.linspace(0, Nx - 1, N_sensors)])
         all_x = Xs[datapoint, :, [-1]]
-        sensor_x = Xs[datapoint, sensor_xind][:, [-1]] # dont mind the last index construct, some bug in torch...collapses dimension if I do it like in all_x
+        sensor_x = Xs[datapoint, sensor_xind][:, [-1]]
         sensor_ys = Xs[datapoint, sensor_xind, :-1]
         pred, stds = gpr(sensor_x, sensor_ys, all_x, sample=sample, n_samples=n_samples)
         #print(pred.shape, sensor_ys.shape)

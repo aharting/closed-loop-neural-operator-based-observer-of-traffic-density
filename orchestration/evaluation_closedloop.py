@@ -71,18 +71,7 @@ def run(config, max_fcst=np.inf, gp_error=True):
                      output_codim=T_out
                      ).to(device)
     ic_model.load_state_dict(torch.load(config_ic['train']['save_path'], weights_only=True))
-    model = Sequential(ic_model=ic_model,
-                       deltaT=deltaT,
-                       T_out=T_out,
-                       device=device,
-                       modes1=config['model']['modes1'],
-                       modes2=config['model']['modes2'],
-                       fc_dim=config['model']['fc_dim'],
-                       layers=config['model']['layers'],
-                       activation=config['model']['activation'],
-                       output_activation=config['model']['output_activation']).to(device)
-    model.load_state_dict(torch.load(config['train']['save_path'], weights_only=True))
-    model_corr = Correction(ic_model=ic_model,
+    model = Correction(ic_model=ic_model,
                         deltaT=deltaT,
                         T_out=T_out,
                         device=device,
@@ -92,10 +81,9 @@ def run(config, max_fcst=np.inf, gp_error=True):
                         layers=config['model']['layers'],
                         activation=config['model']['activation'],
                         output_activation=config['model']['output_activation']).to(device)
-    model_corr.load_state_dict(torch.load(config['train']['save_path'], weights_only=True))
+    model.load_state_dict(torch.load(config['train']['save_path'], weights_only=True))
     
     evaluate_dual(model=model,
-                  model_corr=model_corr, 
                   loader=loader, 
                   config=config, 
                   device=device, 

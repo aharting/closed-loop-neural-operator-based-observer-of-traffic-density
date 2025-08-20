@@ -253,7 +253,7 @@ def unravel_frame_uncorrected(model, ic_data, frame_true, T_in, T_out, N_sensors
             xbcs = torch.concatenate((xbcs, (torch.mean(xbc, dim=1)).squeeze(0)), axis=1) # display gp
     return frame_pred, xbcs, score
     
-def unravel_dual(model, model_corr, loader, device, T_in, T_out, N_sensors, myeval_frame=LpLoss(d=2, p=2), myeval_t=LpLoss(d=1, p=2, reduce_dims=None), sample=False, n_samples=1, max_fcst=np.inf, gp_error=True, std_y=0):
+def unravel_dual(model, loader, device, T_in, T_out, N_sensors, myeval_frame=LpLoss(d=2, p=2), myeval_t=LpLoss(d=1, p=2, reduce_dims=None), sample=False, n_samples=1, max_fcst=np.inf, gp_error=True, std_y=0):
     model.eval()
     model.ic_model.eval()
     ypred= []
@@ -301,7 +301,7 @@ def unravel_dual(model, model_corr, loader, device, T_in, T_out, N_sensors, myev
             frame_corrected, _, score = torch.zeros_like(frame_base), None, torch.zeros_like(score) # unravel_frame_corrected(model=model, ic_data=ic_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, N_sensors=N_sensors, sample=sample, n_samples=n_samples, myeval=myeval_t, gp_error=gp_error, T_fcst=1, max_fcst=max_fcst) # frame_true is used for correction measurements and score
             scores_corrected.append(score.cpu().numpy())
             
-            frame_pred, xbcs, score = unravel_frame_uncorrected(model=model_corr, ic_data=ic_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, N_sensors=N_sensors, sample=sample, n_samples=n_samples, myeval=myeval_t, gp_error=gp_error, T_fcst=1, max_fcst=max_fcst) # frame_true is used for correction measurements and score
+            frame_pred, xbcs, score = unravel_frame_uncorrected(model=model, ic_data=ic_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, N_sensors=N_sensors, sample=sample, n_samples=n_samples, myeval=myeval_t, gp_error=gp_error, T_fcst=1, max_fcst=max_fcst) # frame_true is used for correction measurements and score
             scores_pred.append(score.cpu().numpy())
             
             
@@ -355,100 +355,4 @@ def unravel_dual(model, model_corr, loader, device, T_in, T_out, N_sensors, myev
         "scores_base_reset":np.array(scores_base_reset),
         "scores_corrected":np.array(scores_corrected)
     }
-    return results
-
-def unravel_frame_1step(model, ic_data, frame_true, T_in, T_out, N_sensors, sample, n_samples, myeval, gp_error):
-    # Unravel sequential model
-    # For the first initial condition: sample ic and average base prediction output
-    _xic, first_xic, display_xic = ic_data
-    frame_pred = display_xic # mean of samples
-    if gp_error:
-        xbcs = display_xic - display_xic
-    else:
-        xbcs = display_xic
-    xic = copy.deepcopy(first_xic) # Model expects sampled ic
-    unflat_shape = xic.shape[:2]
-    xic_flat = xic.flatten(start_dim=0, end_dim=1)
-    pred_y = model.ic_model(xic_flat)
-    pred_y = torch.unflatten(pred_y, dim=0, sizes=unflat_shape)
-    pred_y = torch.mean(pred_y, dim=1) # mean over samples
-    # Compute score for uncorrected
-    y = frame_true[..., frame_pred.shape[1]:frame_pred.shape[1] + T_out].unsqueeze(0)
-    score = myeval(torch.swapaxes(pred_y, 0, -1).squeeze(-1), torch.swapaxes(y, 0, -1).squeeze(-1))
-    # Correction
-    xbc, _ = gpr_bcs(_xic.cpu(), y.cpu(), N_sensors=N_sensors, sample=sample, n_samples=n_samples)
-    xbc = torch.tensor(xbc, device=first_xic.device.type, dtype=torch.float)
-    ic = torch.concatenate((xic, xbc), axis=-1)
-    # Display corrected
-    pred_y_corrected = model(ic) # output prediction is averaged across input samples in fwd call
-    frame_pred = torch.concat((frame_pred, pred_y_corrected.squeeze(0)), axis=1)
-    if gp_error:
-        xbcs = torch.concatenate((xbcs, (pred_y - torch.mean(xbc[..., :-1], dim=1)).squeeze(0)), axis=1) # display gp error
-    else:
-        xbcs = torch.concatenate((xbcs, (torch.mean(xbc[..., :-1], dim=1)).squeeze(0)), axis=1) # display gp
-    xic = pred_y_corrected[..., -T_in:]
-    xic = torch.concatenate((xic, _xic[..., [-1]]), axis=-1)
-    pred_y = model.ic_model(xic)
-    # Compute score for uncorrected
-    y = frame_true[..., frame_pred.shape[1]:frame_pred.shape[1] + T_out].unsqueeze(0)
-    _score = myeval(torch.swapaxes(pred_y, 0, -1).squeeze(-1), torch.swapaxes(y, 0, -1).squeeze(-1))
-    score = torch.concatenate((score, _score), axis=0)
-    # Display uncorrected 
-    frame_pred = torch.concat((frame_pred, pred_y.squeeze(0)), axis=1)
-    return frame_pred, xbcs, score
-
-def unravel_dual_1step(model, loader, device, T_in, T_out, N_sensors, myeval_t=LpLoss(d=1, p=2, reduce_dims=None), sample=False, n_samples=1, gp_error=True, std_y=0, display_noisy=False):
-    N = len(loader)
-    model.eval()
-    model.ic_model.eval()
-    ypred= []
-    ytrue = []
-    ybase = []
-    bcs = []
-    score_base = []
-    score_pred = []
-    assert T_in <= T_out
-    with torch.no_grad():
-        for i, _data in enumerate(loader):
-            all_x, all_y = _data
-            all_x, all_y = all_x.to(device), all_y.to(device)   
-            all_x, all_y = all_x.squeeze(0), all_y.squeeze(0)
-            data = (all_x, all_y)
-            if display_noisy:
-                # Perturb data
-                all_x = torch.concatenate((
-                    torch.clamp(all_x[..., :-1] + std_y*torch.randn_like(all_x[..., :-1]), 0, 1),
-                    all_x[..., [-1]]), axis=-1)
-                all_y = torch.clamp(all_y + std_y*torch.randn_like(all_y), 0, 1)
-                data = (all_x, all_y)
-            frame_true = unravel_frame_true(data, max_unravel=2)
-                 
-            ic_data = _first_xic(data=data, N_sensors=N_sensors, sample=False) #_first_xic(data=data, N_sensors=N_sensors, sample=sample, n_samples=n_samples)
-            frame_pred, xbcs, score = unravel_frame_1step(model, ic_data, frame_true, T_in, T_out, N_sensors, sample, n_samples, myeval_t, gp_error)
-            score_pred.append(score.detach().cpu().numpy())
-            frame_base, score = unravel_frame_base(model, ic_data, frame_true, T_in, T_out, myeval_t)
-            score_base.append(score.detach().cpu().numpy())
-            
-            Tmax = min(frame_pred.shape[1], frame_base.shape[1], frame_true.shape[1]) # if cap unravel, have mismatch in T
-            frame_true = frame_true[..., :Tmax]
-            frame_base = frame_base[..., :Tmax]
-            frame_pred = frame_pred[..., :Tmax]
-            xbcs = xbcs[..., :Tmax]
-            frame_true = frame_true.cpu().numpy()
-            frame_base = frame_base.detach().cpu().numpy()
-            frame_pred = frame_pred.detach().cpu().numpy()
-            xbcs = xbcs.cpu().numpy()
-
-            ytrue.append(frame_true)
-            ybase.append(frame_base)
-            ypred.append(frame_pred)
-            bcs.append(xbcs)
-    results = {
-        "ytrue":np.array(ytrue),
-        "ypred":np.array(ypred),
-        "ybase":np.array(ybase),
-        "bcs":np.array(bcs),
-        "scores_pred":np.array(score_pred),
-        "scores_base":np.array(score_base)
-        }
     return results
