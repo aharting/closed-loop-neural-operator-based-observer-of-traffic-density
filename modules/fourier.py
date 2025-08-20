@@ -350,7 +350,6 @@ class Correction(FNN2d):
         self.device = device
     def forward(self, x1, x2):
         """
-        x is a concatenation of xic and xbc along the last axis. xbc starts at index self.bcstart.
         input xic: evaluation + 1 locations (u_1(x), ..., u_N(x), x) (for example, u_1=u(t1, x), u2=u(t2, x), ...)
         input xic shape: (batchsize, samples, x=x_discretisation, c=T_in + 1)
         input xbc shape: (batchsize, samples, x=x_discretization, c=T_out + 1) # Use GPR to interpolate between spatially sparse measurments

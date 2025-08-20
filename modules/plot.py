@@ -9,8 +9,8 @@ try:
     sys.path.remove(str(parent))
 except ValueError:
     pass
-plt.rcParams["text.usetex"] = True
-plt.rcParams.update({'font.size': 13})
+#plt.rcParams["text.usetex"] = True
+#plt.rcParams.update({'font.size': 13})
 
 def idx(row, column, total_rows=1):
     if total_rows == 1:
@@ -43,8 +43,8 @@ def plot_reconstruction(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, sca
     axs[i].set_title(r'Exact $\rho(x, t)$')
     axs[i].axvline(x=deltaT * T_in, c="red")
     k = T_in
-    while k + T_out < frame_base.shape[1]:
-        k+= T_out
+    while k + T_out < frame_pred.shape[1]:
+        k += T_out
         axs[i].axvline(x=k * deltaT, c="red")
     for sensor in sensors:
         axs[i].axhline(y=sensor, c="black")

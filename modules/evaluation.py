@@ -13,7 +13,7 @@ try:
     sys.path.remove(str(parent))
 except ValueError:
     pass
-plt.rcParams["text.usetex"] = True
+#plt.rcParams["text.usetex"] = True
 #plt.rcParams.update({'font.size': 25})
 #plt.rcParams.update({'ytick.labelsize': 14, 'xtick.labelsize': 14})       # Y tick font size
 
@@ -346,7 +346,7 @@ def evaluate_accuracy(model, model_corr, loaders, config, device, deltaX, deltaT
                             deltaT=deltaT,
                             T_in=T_in,
                             scaled_solution=scaled_solution,
-                            fname=f"{dir}/illu2_unravel_{max_fcst}_{id}_experiment_{i}",
+                            fname=f"{dir}/observers_{max_fcst}_{id}_experiment_{i}",
                             sensors=sensors)
             fig, ax = plt.subplots()
             ax.scatter(np.arange(full_scores_pred.shape[0]), full_scores_pred)
@@ -383,7 +383,7 @@ def evaluate_accuracy(model, model_corr, loaders, config, device, deltaX, deltaT
             ax.set_xlabel("t")
             # fig.suptitle("Evolution of L2 error")
             fig.tight_layout()
-            fig.savefig(fname=f"{dir}/{id}_l2_error_distribution")
+            fig.savefig(fname=f"{dir}/{id}_batch_l2_error_distribution")
 
             np.save(f"{dir}/unravel_{max_fcst}_{id}_scores_pred.npy", scores_pred)
             np.save(f"{dir}/unravel_{max_fcst}_{id}_scores_base.npy", scores_base)
@@ -414,7 +414,7 @@ def evaluate_accuracy(model, model_corr, loaders, config, device, deltaX, deltaT
         scores[f"{key}"]["Open loop"] = full_scores_base
 
     df = pd.DataFrame.from_dict(scores, orient='columns')
-    df.to_csv(f"{dir}/{id}_accuracy_robustness.csv")
+    df.to_csv(f"{dir}/{id}_batch_accuracy_robustness.csv")
     df = df.reset_index().rename(columns={'index': 'model'})
     df = df.melt(id_vars=["model"], var_name="dataset", value_name="errors")
     df = df.explode("errors", ignore_index=True)
@@ -427,7 +427,7 @@ def evaluate_accuracy(model, model_corr, loaders, config, device, deltaX, deltaT
     plt.ylabel(eval_name)
     # plt.title("Robustness")
     plt.legend(title="Model")
-    plt.savefig(fname=f"{dir}/{id}_accuracy_robustness")
+    plt.savefig(fname=f"{dir}/{id}_batch_accuracy_robustness")
 
 def evaluate_base_io(model, loader, config, device, deltaX, deltaT, T_in, T_out, figscale=None, id='test'):
     dir = config['main_dir'] + config['test']['save_dir']

@@ -66,8 +66,7 @@ def run(config, max_fcst=np.inf):
                      input_codim=T_in,
                      output_codim=T_out
                      ).to(device)
-    ic_model.load_state_dict(torch.load(
-        config_ic['train']['save_path'], weights_only=True))
+    ic_model.load_state_dict(torch.load(config_ic['train']['save_path'], weights_only=True))
     model = Sequential(ic_model=ic_model,
                        deltaT=deltaT,
                        T_out=T_out,
@@ -78,9 +77,7 @@ def run(config, max_fcst=np.inf):
                        layers=config['model']['layers'],
                        activation=config['model']['activation'],
                        output_activation=config['model']['output_activation']).to(device)
-    model.load_state_dict(torch.load(
-        config['train']['save_path'], weights_only=True))
-
+    model.load_state_dict(torch.load(config['train']['save_path'], weights_only=True))
     model_corr = Correction(ic_model=ic_model,
                             deltaT=deltaT,
                             T_out=T_out,

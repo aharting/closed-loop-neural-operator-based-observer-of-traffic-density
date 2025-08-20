@@ -16,6 +16,7 @@ from modules.data import gpr_bcs, gpr_ics
 from tqdm import tqdm
 
 def unravel(model, loader, device, T_in, T_out, myeval_frame=LpLoss(d=2, p=2), max_unravel=np.inf):
+    """Open-loop unrolling (autoregression)"""
     N = len(loader)
     model.eval()
     full_scores_pred = []
@@ -29,7 +30,7 @@ def unravel(model, loader, device, T_in, T_out, myeval_frame=LpLoss(d=2, p=2), m
             all_x, all_y = all_x.to(device), all_y.to(device)   
             all_x, all_y = all_x.squeeze(0), all_y.squeeze(0)
             ic = all_x[0]
-            n_unravel=1
+            n_unravel = 1
             for j in range(all_x.shape[0]):
                 data_x, data_y = all_x[j], all_y[j]
                 if j == 0:
@@ -59,8 +60,7 @@ def unravel(model, loader, device, T_in, T_out, myeval_frame=LpLoss(d=2, p=2), m
     results = {
         "ytrue":np.array(ytrue),
         "ypred":np.array(ypred),
-        "full_scores_pred":np.array(full_scores_pred)
-    }
+        "full_scores_pred":np.array(full_scores_pred)}
     return results
 
 def unravel_frame_true(data, max_unravel):
