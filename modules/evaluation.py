@@ -21,8 +21,7 @@ def evaluate(model, loader, config, device, deltaX, deltaT, T_in, T_out, id='tes
     dir = config['main_dir'] + config['test']['save_dir']
     scaled_solution = config['data']['scaled_solution']
     eval_name=r"$L_2$"
-    results = unravel(
-        model=model, loader=loader, device=device, T_in=T_in, T_out=T_out, max_unravel=max_unravel)
+    results = unravel(model=model, loader=loader, device=device, T_in=T_in, T_out=T_out, max_unravel=max_unravel)
     ypred = results["ypred"]
     ytrue = results["ytrue"]
     full_scores_pred = results["full_scores_pred"]

@@ -2,7 +2,7 @@ main_dir: ''
 data:
   name: 'openloop'
   train_data_dir: "data/train"
-  test_data_dir: "data/test_id_minimal"
+  test_data_dir: "data/test_minimal"
   scaled_solution: True
   T_in: 10
   T_out: 100
