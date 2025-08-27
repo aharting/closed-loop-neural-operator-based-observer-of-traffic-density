@@ -12,13 +12,14 @@ import argparse
 import torch
 from modules.fourier import FNN1d
 from modules.data import gen_data_train, load_config
-from modules.pdeno import train
+from modules.train import train
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", 
-                    type=str, 
-                    help="Base operator config file path", 
+                    type=str,
+                    default="configs/openloop.yaml", 
+                    help="Prediction operator config file path", 
                     required=False)
 
 def run(config):
@@ -48,7 +49,7 @@ def run(config):
                   output_codim=T_out
                   ).to(device)
     
-    model = train(model=model, config=config, train_loader=train_loader, device=device)
+    model = train(model=model, config=config, train_loader=train_loader, device=device, operator="prediction")
     torch.save(model.state_dict(), config['main_dir'] + config['train']['save_path'])
 
 if __name__ == "__main__":
