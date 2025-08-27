@@ -11,7 +11,7 @@ except ValueError:
 import argparse
 import torch
 import numpy as np
-from modules.fourier import FNN1d, Correction
+from modules.models import Prediction, Correction
 from modules.data import gen_data_test, load_config
 from modules.evaluation import inspect_observers
 
@@ -41,6 +41,9 @@ parser.add_argument("--gp_error",
                     required=False,
                     default=False)
 def run(config, max_fcst=np.inf, gp_error=True):
+    directory = config["test"]["save_dir"]
+    directory.mkdir(parents=True, exist_ok=True)
+
     if config['train']['device'] is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
@@ -59,7 +62,7 @@ def run(config, max_fcst=np.inf, gp_error=True):
     loader = test_loader
 
     config_ic = load_config(config['model']['base_model_config'])
-    ic_model = FNN1d(modes1=config_ic['model']['modes1'],
+    ic_model = Prediction(modes1=config_ic['model']['modes1'],
                      fc_dim=config_ic['model']['fc_dim'],
                      layers=config_ic['model']['layers'],
                      activation=config_ic['model']['activation'],
@@ -67,7 +70,7 @@ def run(config, max_fcst=np.inf, gp_error=True):
                      input_codim=T_in,
                      output_codim=T_out
                      ).to(device)
-    ic_model.load_state_dict(torch.load(config_ic['train']['save_path'], weights_only=True))
+    ic_model.load_state_dict(torch.load("models/"+ config_ic['train']['fname'], weights_only=True))
     model = Correction(ic_model=ic_model,
                         deltaT=deltaT,
                         T_out=T_out,
@@ -78,7 +81,7 @@ def run(config, max_fcst=np.inf, gp_error=True):
                         layers=config['model']['layers'],
                         activation=config['model']['activation'],
                         output_activation=config['model']['output_activation']).to(device)
-    model.load_state_dict(torch.load(config['train']['save_path'], weights_only=True))
+    model.load_state_dict(torch.load("models/" + config['train']['fname'], weights_only=True))
     
     inspect_observers(model=model,
                   loader=loader, 

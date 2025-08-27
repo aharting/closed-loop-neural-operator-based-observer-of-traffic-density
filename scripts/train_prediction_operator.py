@@ -10,7 +10,7 @@ except ValueError:
     
 import argparse
 import torch
-from modules.fourier import FNN1d
+from modules.models import Prediction
 from modules.data import gen_data_train, load_config
 from modules.train import train
 
@@ -23,6 +23,9 @@ parser.add_argument("--config",
                     required=False)
 
 def run(config):
+    directory = "models"
+    directory.mkdir(parents=True, exist_ok=True)
+
     if config['train']['device'] is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
@@ -40,7 +43,7 @@ def run(config):
     train_dataset = torch.utils.data.TensorDataset(Xs, ys)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=config['train']['batchsize'], shuffle=True)
     
-    model = FNN1d(modes1=config['model']['modes1'],
+    model = Prediction(modes1=config['model']['modes1'],
                   fc_dim=config['model']['fc_dim'],
                   layers=config['model']['layers'],
                   activation=config['model']['activation'],
@@ -50,7 +53,7 @@ def run(config):
                   ).to(device)
     
     model = train(model=model, config=config, train_loader=train_loader, device=device, operator="prediction")
-    torch.save(model.state_dict(), config['main_dir'] + config['train']['save_path'])
+    torch.save(model.state_dict(), "models/" + config['train']['fname'])
 
 if __name__ == "__main__":
     args = parser.parse_args()

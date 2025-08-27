@@ -23,7 +23,7 @@ train:
   milestones: [100, 200, 300, 400, 500]
   base_lr: 0.001
   scheduler_gamma: 0.5
-  save_path: 'models/openloop.pt'
+  fname: 'openloop.pt'
   train_test_split: 0.1
   use_tqdm: True
 

@@ -31,7 +31,7 @@ train:
   milestones: [100, 200, 300, 400, 500]
   base_lr: 0.001
   scheduler_gamma: 0.5
-  save_path: 'models/closedloop.pt'
+  fname: 'closedloop.pt'
   use_tqdm: True
 
 test:

@@ -12,17 +12,7 @@ except ValueError:
     pass
 from modules.evaluation import report_openloop, report_unrolled, report_accuracy
 from modules.data import gen_data_test, load_config
-from modules.fourier import FNN1d, Correction
-
-def str2bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+from modules.models import Prediction, Correction
 
 
 parser = argparse.ArgumentParser()
@@ -37,6 +27,9 @@ parser.add_argument("--max_fcst",
                     default=np.inf)
 
 def run(config, max_fcst=np.inf):
+    directory = config["test"]["save_dir"]
+    directory.mkdir(parents=True, exist_ok=True)
+
     if config['train']['device'] is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
@@ -69,7 +62,7 @@ def run(config, max_fcst=np.inf):
     loaders["ood"] = ood_loaders
 
     config_ic = load_config(config['model']['base_model_config'])
-    ic_model = FNN1d(modes1=config_ic['model']['modes1'],
+    ic_model = Prediction(modes1=config_ic['model']['modes1'],
                      fc_dim=config_ic['model']['fc_dim'],
                      layers=config_ic['model']['layers'],
                      activation=config_ic['model']['activation'],
@@ -77,7 +70,7 @@ def run(config, max_fcst=np.inf):
                      input_codim=T_in,
                      output_codim=T_out
                      ).to(device)
-    ic_model.load_state_dict(torch.load(config_ic['train']['save_path'], weights_only=True))
+    ic_model.load_state_dict(torch.load("models/" + config_ic['train']['fname'], weights_only=True))
     model = Correction(ic_model=ic_model,
                         deltaT=deltaT,
                         T_out=T_out,
@@ -88,7 +81,7 @@ def run(config, max_fcst=np.inf):
                         layers=config['model']['layers'],
                         activation=config['model']['activation'],
                         output_activation=config['model']['output_activation']).to(device)
-    model.load_state_dict(torch.load(config['train']['save_path'], weights_only=True))
+    model.load_state_dict(torch.load("models/" + config['train']['fname'], weights_only=True))
 
     report_openloop(model=ic_model,
                      loader=images_loader,

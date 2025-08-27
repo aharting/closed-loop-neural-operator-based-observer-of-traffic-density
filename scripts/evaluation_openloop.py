@@ -12,7 +12,7 @@ from modules.data import gen_data_test
 import argparse
 import torch
 import numpy as np
-from modules.fourier import FNN1d, FNN2d
+from modules.models import Prediction
 from modules.data import load_config
 from modules.evaluation import inspect_ol
 
@@ -27,6 +27,9 @@ parser.add_argument("--max_unroll",
                     required=False,
                     default=np.inf)
 def run(config, max_unroll=np.inf):
+    directory = config["test"]["save_dir"]
+    directory.mkdir(parents=True, exist_ok=True)
+
     if config['train']['device'] is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
@@ -45,7 +48,7 @@ def run(config, max_unroll=np.inf):
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)  
     loader = test_loader
 
-    model = FNN1d(modes1=config['model']['modes1'],
+    model = Prediction(modes1=config['model']['modes1'],
                     fc_dim=config['model']['fc_dim'],
                     layers=config['model']['layers'],
                     activation=config['model']['activation'],
@@ -53,7 +56,7 @@ def run(config, max_unroll=np.inf):
                     input_codim=T_in,
                     output_codim=T_out
                     ).to(device)
-    model.load_state_dict(torch.load(config['train']['save_path'], weights_only=True, map_location=device))
+    model.load_state_dict(torch.load("models/" + config['train']['fname'], weights_only=True, map_location=device))
     model.eval()
 
     inspect_ol(model=model, loader=loader, config=config, device=device, deltaX=deltaX, deltaT=deltaT, T_in=T_in, T_out=T_out, id='test', max_unroll=max_unroll)

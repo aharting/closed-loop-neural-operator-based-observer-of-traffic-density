@@ -10,7 +10,7 @@ except ValueError:
     
 import argparse
 import torch
-from modules.fourier import FNN1d, Correction
+from modules.models import Prediction, Correction
 from modules.data import gen_data_train, load_config, gpr_ics, gpr_bcs
 from modules.train import train
 
@@ -34,6 +34,9 @@ class TripleTensorDataset(torch.utils.data.TensorDataset):
         return self.X[idx], self.Z[idx], self.y[idx]
     
 def run(config):
+    directory = "models"
+    directory.mkdir(parents=True, exist_ok=True)
+
     if config['train']['device'] is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
@@ -66,7 +69,7 @@ def run(config):
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=config['train']['batchsize'], shuffle=True)
 
     config_ic = load_config(config['model']['base_model_config'])
-    ic_model = FNN1d(modes1=config_ic['model']['modes1'],
+    ic_model = Prediction(modes1=config_ic['model']['modes1'],
                      fc_dim=config_ic['model']['fc_dim'],
                      layers=config_ic['model']['layers'],
                      activation=config_ic['model']['activation'],
@@ -75,7 +78,7 @@ def run(config):
                      output_codim=T_out
                      )
     
-    ic_model.load_state_dict(torch.load(config_ic['train']['save_path'], weights_only=True))
+    ic_model.load_state_dict(torch.load("models/" + config_ic['train']['fname'], weights_only=True))
     model = Correction(ic_model=ic_model,
                        deltaT=deltaT,
                        T_out=T_out,
@@ -88,7 +91,7 @@ def run(config):
                        output_activation=config['model']['output_activation'])
 
     model = train(model=model, config=config, train_loader=train_loader, device=device, operator="correction")
-    torch.save(model.state_dict(), config['main_dir'] + config['train']['save_path'])
+    torch.save(model.state_dict(), "models/" + config['train']['fname'])
 
 if __name__ == "__main__":
     args = parser.parse_args()
