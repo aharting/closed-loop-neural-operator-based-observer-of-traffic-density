@@ -295,22 +295,14 @@ class Sequential(FNN2d):
         self.gridt = np.linspace(0, deltaT * (T_out - 1), num=T_out, dtype=np.float32)
         self.device = device
     def forward(self, x):
-        """
-        x is a concatenation of xic and xbc along the last axis. xbc starts at index self.bcstart.
-        input xic: evaluation + 1 locations (u_1(x), ..., u_N(x), x) (for example, u_1=u(t1, x), u2=u(t2, x), ...)
-        input xic shape: (batchsize, samples, x=x_discretisation, c=T_in + 1)
-        input xbc shape: (batchsize, samples, x=x_discretization, c=T_out + 1) # Use GPR to interpolate between spatially sparse measurments
-        output: the solution of the next timestep
-        output shape: (batchsize, x=x_discretisation, c=T_out)
-        """
         unflat_shape = x.shape[:2]
         x = x.flatten(start_dim=0, end_dim=1)
         xic = x[..., :self.bcstart]
         xbc = x[..., self.bcstart:]
         x1 = self.ic_model(xic)
         x2 = xbc
-        x2 = x1 - x2[..., :-1] # Luenberger-like observer
-        x = torch.cat((x1.unsqueeze(-1), x2.unsqueeze(-1)), dim=-1)
+        e = x1 - x2[..., :-1] # Luenberger-like observer
+        x = torch.cat((x1.unsqueeze(-1), e.unsqueeze(-1)), dim=-1)
         # Create grid
         gridx = copy.deepcopy(xbc[0, ..., -1]).to(self.device)
         gridt = torch.tensor(self.gridt).to(self.device)
@@ -349,13 +341,6 @@ class Correction(FNN2d):
         self.gridt = np.linspace(0, deltaT * (T_out - 1), num=T_out, dtype=np.float32)
         self.device = device
     def forward(self, x1, x2):
-        """
-        input xic: evaluation + 1 locations (u_1(x), ..., u_N(x), x) (for example, u_1=u(t1, x), u2=u(t2, x), ...)
-        input xic shape: (batchsize, samples, x=x_discretisation, c=T_in + 1)
-        input xbc shape: (batchsize, samples, x=x_discretization, c=T_out + 1) # Use GPR to interpolate between spatially sparse measurments
-        output: the solution of the next timestep
-        output shape: (batchsize, x=x_discretisation, c=T_out)
-        """
         unflat_shape = x1.shape[:2]
         x1 = x1.flatten(start_dim=0, end_dim=1)
         x2 = x2.flatten(start_dim=0, end_dim=1)
@@ -374,64 +359,3 @@ class Correction(FNN2d):
         x = torch.unflatten(x, dim=0, sizes=unflat_shape)
         x = torch.mean(x, dim=1) # mean over samples
         return x.squeeze(-1)
-
-class Dummy(nn.Module):
-    def __init__(self, ic_model, bc_model=None,
-                 fc_dim=128, layers=None, output_codim=1, 
-                 activation='gelu', output_activation=None):
-        super(Dummy, self).__init__()
-        self.ic_model = ic_model
-        # Freeze IC model
-        for param in self.ic_model.parameters():
-            param.requires_grad = False
-        
-        if bc_model is None:
-            self.bc_is_id = True
-            self.bc_model = nn.Identity() # bc_model
-        else:
-            self.bc_is_id = False
-            self.bc_model = bc_model 
-        self.bcstart = ic_model.in_dim
-        self.fc_dim = fc_dim
-        self.activation = activation
-        if layers is None:
-            self.layers = [fc_dim] * 1
-        else:
-            self.layers = layers
-        self.fc1 = nn.Linear(output_codim * 2, self.layers[0])
-        self.fc2 = nn.Linear(self.layers[0], output_codim)
-
-        if activation =='tanh':
-            self.activation = F.tanh
-        elif activation == 'gelu':
-            self.activation = F.gelu
-        elif activation == 'relu':
-            self.activation == F.relu
-        else:
-            raise ValueError(f'{activation} is not supported')
-
-        if output_activation =='tanh':
-            self.output_activation = F.tanh
-        elif output_activation == 'gelu':
-            self.output_activation = F.gelu
-        elif output_activation == 'relu':
-            self.output_activation == F.relu
-        elif output_activation == 'sigmoid':
-            self.output_activation = F.sigmoid
-        elif output_activation is None:
-            self.output_activation = None
-        else:
-            raise ValueError(f'{output_activation} is not supported')
-            
-    def forward(self, x):
-        """
-        x is a concatenation of xic and xbc along the last axis. xbc starts at index self.bcstart.
-        input xic: evaluation + 1 locations (u_1(x), ..., u_N(x), x) (for example, u_1=u(t1, x), u2=u(t2, x), ...)
-        input xic shape: (batchsize, x=x_discretisation, c=T_in + 1)
-        input xbc shape: (batchsize, x=x_discretization, c=T_out + 1) # Use GPR to interpolate between spatially sparse measurments
-        output: the solution of the next timestep
-        output shape: (batchsize, x=x_discretisation, c=T_out)
-        """
-        xic = x[:, :, :self.bcstart]
-        x1 = self.ic_model(xic)
-        return x1
