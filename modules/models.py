@@ -2,7 +2,7 @@
 import torch
 import copy
 import numpy as np
-from models import FNN1d, FNN2d
+from imported.models import FNN1d, FNN2d
 
 class Prediction(FNN1d):
     pass

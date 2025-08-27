@@ -27,7 +27,7 @@ parser.add_argument("--max_unroll",
                     required=False,
                     default=np.inf)
 def run(config, max_unroll=np.inf):
-    directory = config["test"]["save_dir"]
+    directory = Path(config["test"]["save_dir"])
     directory.mkdir(parents=True, exist_ok=True)
 
     if config['train']['device'] is None:

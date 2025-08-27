@@ -34,7 +34,7 @@ class TripleTensorDataset(torch.utils.data.TensorDataset):
         return self.X[idx], self.Z[idx], self.y[idx]
     
 def run(config):
-    directory = "models"
+    directory = Path("models")
     directory.mkdir(parents=True, exist_ok=True)
 
     if config['train']['device'] is None:

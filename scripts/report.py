@@ -27,7 +27,7 @@ parser.add_argument("--max_fcst",
                     default=np.inf)
 
 def run(config, max_fcst=np.inf):
-    directory = config["test"]["save_dir"]
+    directory = Path(config["test"]["save_dir"])
     directory.mkdir(parents=True, exist_ok=True)
 
     if config['train']['device'] is None:

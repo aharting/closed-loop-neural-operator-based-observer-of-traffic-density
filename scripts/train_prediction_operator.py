@@ -23,7 +23,7 @@ parser.add_argument("--config",
                     required=False)
 
 def run(config):
-    directory = "models"
+    directory = Path("models")
     directory.mkdir(parents=True, exist_ok=True)
 
     if config['train']['device'] is None:

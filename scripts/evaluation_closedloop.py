@@ -41,7 +41,7 @@ parser.add_argument("--gp_error",
                     required=False,
                     default=False)
 def run(config, max_fcst=np.inf, gp_error=True):
-    directory = config["test"]["save_dir"]
+    directory = Path(config["test"]["save_dir"])
     directory.mkdir(parents=True, exist_ok=True)
 
     if config['train']['device'] is None:
