@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn as sns
 import sys
 from pathlib import Path
 file = Path(__file__).resolve()
@@ -9,13 +11,111 @@ try:
     sys.path.remove(str(parent))
 except ValueError:
     pass
-plt.rcParams["text.usetex"] = True
-plt.rcParams.update({'font.size': 18})
+try:
+    plt.rcParams["text.usetex"] = True
+except:
+    pass
+
+def default_rcParams():
+    plt.rcdefaults()
+    plt.rcParams.update({'font.size': 18})
 
 def idx(row, column, total_rows=1):
     if total_rows == 1:
         return column
     return (row, column)
+
+def plot_test_scores(full_scores_pred, fname):
+    fig, ax = plt.subplots()
+    ax.scatter(np.arange(full_scores_pred.shape[0]), full_scores_pred)
+    ax.set_xlabel("Test example")
+    ax.set_ylabel("Score")
+    fig.suptitle(
+        f"Average relative L2 error in test set{'{:10.3f}'.format(np.mean(full_scores_pred))}")
+    fig.savefig(fname=fname)
+
+def plot_l2_error_evolution_unformatted(scores_pred, scores_base_reset, scores_base, T_in, T_out, deltaT, fname):
+    fig, ax = plt.subplots()
+    x = np.arange(T_in, T_in + scores_pred.shape[1]) * deltaT
+    anchored=scores_pred
+    y_std = np.std(anchored, axis=0)
+    y_mean = np.mean(anchored, axis=0)
+    ax.plot(x, y_mean, label=r'Closed loop')
+    #ax.fill_between(x, y_mean - y_std, y_mean + y_std, color='blue', alpha=0.3)
+
+    anchored = scores_base_reset
+    y_std = np.std(anchored, axis=0)
+    y_mean = np.mean(anchored, axis=0)
+    ax.plot(x, y_mean, label=r'Open loop with reset')
+    #ax.fill_between(x, y_mean - y_std, y_mean + y_std, color='green', alpha=0.3)
+
+    anchored = scores_base
+    y_std = np.std(anchored, axis=0)
+    y_mean = np.mean(anchored, axis=0)
+    ax.plot(x, y_mean, label=r'Open loop')
+    #ax.fill_between(x, y_mean - y_std, y_mean + y_std, color='red', alpha=0.3)
+
+    ax.legend()
+    ax.set_ylabel(r"Relative $L_2$ error")
+    ax.set_xlabel(r"$t$ [min]")
+    fig.tight_layout()
+    fig.savefig(fname=fname)
+
+def plot_l2_error_evolution_formatted(scores_pred, scores_base_reset, scores_base, T_in, T_out, deltaT, fname):
+    plt.rcParams.update({'font.size': 12})
+    plt.rcParams.update({'ytick.labelsize': 22, 'xtick.labelsize': 22, 'axes.labelsize': 30},)       # Y tick font size
+    k=0
+    r=150
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    x = np.arange(T_in + T_out, T_in + T_out + scores_pred.shape[1]) * deltaT
+    anchored=scores_pred
+    #anchored = np.sort(anchored, axis=0)#[k:-k]
+    y_mean = np.mean(anchored, axis=0)
+    y_rolling = pd.Series(y_mean).rolling(r).mean().to_numpy()
+    #ax.plot(x, y_mean, label=r'Closed loop')
+    ax.semilogy(x, y_rolling, label=r'Closed loop')
+
+    anchored = scores_base_reset
+    #anchored = np.sort(anchored, axis=0)#[k:-k]
+    y_mean = np.mean(anchored, axis=0)
+    y_rolling = pd.Series(y_mean).rolling(r).mean().to_numpy()
+    #ax.plot(x, y_mean, label=r'Open loop with reset')
+    ax.semilogy(x, y_rolling, label=r'Open loop with reset', linestyle='--')
+
+    anchored = scores_base
+    #anchored = np.sort(anchored, axis=0)#[k:-k]
+    y_mean = np.mean(anchored, axis=0)
+    y_rolling = pd.Series(y_mean).rolling(r).mean().to_numpy()
+    #ax.plot(x, y_mean, label=r'Open loop')
+    ax.semilogy(x, y_rolling, label=r'Open loop', linestyle='-.')
+
+    ax.legend(fontsize=22)
+    ax.set_ylabel(r"Relative $L_2$ error")
+    ax.set_xlabel(r"$t$ [min]")
+    ax.grid(axis='y')
+    ax.set_yscale('log')
+    ax.set_ylim(0.11, 0.3)
+    ax.grid(which='minor')
+    for tick in ax.yaxis.get_ticklabels():
+        tick.set_fontsize(5)
+    fig.tight_layout()
+    fig.savefig(fname=fname)
+    default_rcParams()
+
+def plot_accuracy_robustness(df, fname):
+    plt.rcParams.update({'font.size': 12})
+    plt.rcParams.update({'ytick.labelsize': 22, 'xtick.labelsize': 30, 'axes.labelsize': 30},)       # Y tick font size
+
+    plt.figure(figsize=(12, 6))
+    sns.boxplot(x='dataset', y='errors', hue='model', data=df, hue_order=["Closed loop", "Open loop with reset", "Open loop"])
+
+    plt.xlabel("Dataset")
+    plt.ylabel(r"Relative $L_2$ error")
+    plt.legend(title="Model", loc="upper right", fontsize=22)
+    plt.tight_layout()
+    plt.savefig(fname=fname)
+    default_rcParams()
 
 def plot_reconstruction(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_solution, fname, frame_true_noisy=None, xbcs=None, frame_base=None, frame_base_reset=None, score_pred=None, score_base=None, score_base_reset=None, sensors=[], gp_error=True):
     total_rows = 2 + (frame_base is not None) * 1 + (frame_base_reset is not None) * 1 

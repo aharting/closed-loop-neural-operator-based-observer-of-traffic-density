@@ -1,9 +1,8 @@
 from modules.unravel import unravel, unravel_dual
-from modules.plot import plot_reconstruction, plot_base_io, plot_unravel_fullstep
+from modules.plot import plot_reconstruction, plot_base_io, plot_unravel_fullstep, plot_test_scores, plot_l2_error_evolution_unformatted, plot_l2_error_evolution_formatted,plot_accuracy_robustness
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
-import seaborn as sns
 import pandas as pd
 from pathlib import Path
 file = Path(__file__).resolve()
@@ -13,9 +12,11 @@ try:
     sys.path.remove(str(parent))
 except ValueError:
     pass
-#plt.rcParams["text.usetex"] = True
-#plt.rcParams.update({'font.size': 25})
-#plt.rcParams.update({'ytick.labelsize': 14, 'xtick.labelsize': 14})       # Y tick font size
+
+def default_rcParams():
+    plt.rcdefaults()
+    plt.rcParams.update({'font.size': 25})
+    plt.rcParams.update({'ytick.labelsize': 14, 'xtick.labelsize': 14})       # Y tick font size
 
 def evaluate(model, loader, config, device, deltaX, deltaT, T_in, T_out, id='test', max_unravel=np.inf):
     """
@@ -122,7 +123,6 @@ def evaluate_dual(model, loader, config, device, deltaX, deltaT, T_in, T_out, id
 
 def report_accuracy(model, loaders, config, device, deltaX, deltaT, T_in, T_out, id='test', max_fcst=np.inf):
     dir = config['main_dir'] + config['test']['save_dir']
-    eval_name = r"$L_2$ error"
     scores = {}
     loader = loaders["id"]
     std_ys= config['test']['std_ys']
@@ -154,43 +154,10 @@ def report_accuracy(model, loaders, config, device, deltaX, deltaT, T_in, T_out,
             scores_base = results["scores_base"]
             scores_base_reset = results["scores_base_reset"]
 
-            fig, ax = plt.subplots()
-            ax.scatter(np.arange(full_scores_pred.shape[0]), full_scores_pred)
-            ax.set_xlabel("Test example")
-            ax.set_ylabel("Score")
-            fig.suptitle(
-                f"Average {eval_name} error in test set{'{:10.3f}'.format(np.mean(full_scores_pred))}")
-            fig.savefig(fname=f"{dir}/{id}_scores")
-            print(
-                f"Average {eval_name} error in test set: {'{:10.3f}'.format(np.mean(full_scores_pred))}")
-
-            fig, ax = plt.subplots()
-            x = np.arange(T_in, T_in + scores_pred.shape[1]) * deltaT
-            anchored=scores_pred
-            y_std = np.std(anchored, axis=0)
-            y_mean = np.mean(anchored, axis=0)
-            ax.plot(x, y_mean, label=r'Closed loop')
-            #ax.fill_between(x, y_mean - y_std, y_mean + y_std, color='blue', alpha=0.3)
-
-            anchored = scores_base_reset
-            y_std = np.std(anchored, axis=0)
-            y_mean = np.mean(anchored, axis=0)
-            ax.plot(x, y_mean, label=r'Open loop with reset')
-            #ax.fill_between(x, y_mean - y_std, y_mean + y_std, color='green', alpha=0.3)
-
-            anchored = scores_base
-            y_std = np.std(anchored, axis=0)
-            y_mean = np.mean(anchored, axis=0)
-            ax.plot(x, y_mean, label=r'Open loop')
-            #ax.fill_between(x, y_mean - y_std, y_mean + y_std, color='red', alpha=0.3)
-
-            ax.legend()
-            ax.set_ylabel(r"Avg $L_2$ error")
-            ax.set_xlabel("t")
-            # fig.suptitle("Evolution of L2 error")
-            fig.tight_layout()
-            fig.savefig(fname=f"{dir}/{id}_batch_l2_error_distribution")
-
+            plot_test_scores(full_scores_pred, fname=f"{dir}/{id}_scores")
+            plot_l2_error_evolution_unformatted(scores_pred, scores_base_reset, scores_base, T_in, T_out, deltaT, fname=f"{dir}/{id}_batch_l2_error_distribution")
+            plot_l2_error_evolution_formatted(scores_pred, scores_base_reset, scores_base, T_in, T_out, deltaT, fname=f"{dir}/{id}_batch_l2_error_distribution_formatted")
+            
             np.save(f"{dir}/unravel_{max_fcst}_{id}_scores_pred.npy", scores_pred)
             np.save(f"{dir}/unravel_{max_fcst}_{id}_scores_base.npy", scores_base)
             np.save(f"{dir}/unravel_{max_fcst}_{id}_scores_base_reset.npy", scores_base_reset)
@@ -223,17 +190,7 @@ def report_accuracy(model, loaders, config, device, deltaX, deltaT, T_in, T_out,
     df = df.reset_index().rename(columns={'index': 'model'})
     df = df.melt(id_vars=["model"], var_name="dataset", value_name="errors")
     df = df.explode("errors", ignore_index=True)
-
-    plt.figure(figsize=(8, 6))
-    sns.boxplot(x='dataset', y='errors', hue='model', data=df, hue_order=["Closed loop", "Open loop with reset", "Open loop"])
-
-    # Labels & Title
-    plt.xlabel("Dataset")
-    plt.ylabel(eval_name)
-    # plt.title("Robustness")
-    plt.legend(title="Model")
-    plt.savefig(fname=f"{dir}/{id}_batch_accuracy_robustness")
-
+    plot_accuracy_robustness(df=df, fname=f"{dir}/{id}_batch_accuracy_robustness")
 
 def report_unrolled(model, loader, config, device, deltaX, deltaT, T_in, T_out, id='test', max_fcst=np.inf):
     dir = config['main_dir'] + config['test']['save_dir']
