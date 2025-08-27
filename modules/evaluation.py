@@ -1,5 +1,5 @@
-from modules.unravel import unravel, unravel_dual
-from modules.plot import plot_reconstruction, plot_base_io, plot_unravel_fullstep, plot_test_scores, plot_l2_error_evolution_unformatted, plot_l2_error_evolution_formatted,plot_accuracy_robustness
+from modules.unroll import unroll_autoregression, unroll_observers
+from modules.plot import plot_inspection, plot_pred_io, plot_unrolled, plot_test_scores, plot_l2_error_evolution_unformatted, plot_l2_error_evolution_formatted,plot_accuracy_robustness
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
@@ -16,23 +16,23 @@ except ValueError:
 def default_rcParams():
     plt.rcdefaults()
     plt.rcParams.update({'font.size': 25})
-    plt.rcParams.update({'ytick.labelsize': 14, 'xtick.labelsize': 14})       # Y tick font size
+    plt.rcParams.update({'ytick.labelsize': 14, 'xtick.labelsize': 14})
 
-def evaluate(model, loader, config, device, deltaX, deltaT, T_in, T_out, id='test', max_unravel=np.inf):
+def inspect_ol(model, loader, config, device, deltaX, deltaT, T_in, T_out, id='test', max_unroll=np.inf):
     """
-    Produces a diagnostic view of open-loop autoregression. One view (image) per sample. 
+    Produces a diagnostic view of open-loop observer (autoregression). One view (image) per sample. 
     """
     dir = config['main_dir'] + config['test']['save_dir']
     scaled_solution = config['data']['scaled_solution']
     eval_name=r"$L_2$"
-    results = unravel(model=model, loader=loader, device=device, T_in=T_in, T_out=T_out, max_unravel=max_unravel)
+    results = unroll_autoregression(model=model, loader=loader, device=device, T_in=T_in, T_out=T_out, max_unroll=max_unroll)
     ypred = results["ypred"]
     ytrue = results["ytrue"]
     full_scores_pred = results["full_scores_pred"]
     for i in range(ypred.shape[0]):
         frame_pred = ypred[i]
         frame_true = ytrue[i]
-        plot_reconstruction(frame_pred=frame_pred, frame_true=frame_true,
+        plot_inspection(frame_pred=frame_pred, frame_true=frame_true,
                             deltaX=deltaX, deltaT=deltaT, T_in=T_in, T_out=T_out,
                             scaled_solution=scaled_solution, fname=f"{dir}/{id}_experiment_{i}")
     fig, ax = plt.subplots()
@@ -47,7 +47,7 @@ def evaluate(model, loader, config, device, deltaX, deltaT, T_in, T_out, id='tes
     return
 
 
-def evaluate_dual(model, loader, config, device, deltaX, deltaT, T_in, T_out, id='test', max_fcst=np.inf, gp_error=True, std_y=0):
+def inspect_observers(model, loader, config, device, deltaX, deltaT, T_in, T_out, id='test', max_fcst=np.inf, gp_error=True, std_y=0):
     """
     Produces a diagnostic view of observers. One view (image) per sample. 
     Includes the true and noisy data, the GP regressed measurements, and the three observers (predictions and errors).
@@ -55,7 +55,7 @@ def evaluate_dual(model, loader, config, device, deltaX, deltaT, T_in, T_out, id
     dir = config['main_dir'] + config['test']['save_dir']
     scaled_solution = config['data']['scaled_solution']
     eval_name = r"$L_2$"
-    results = unravel_dual(model=model,
+    results = unroll_observers(model=model,
                            loader=loader,
                            device=device,
                            T_in=T_in,
@@ -90,7 +90,7 @@ def evaluate_dual(model, loader, config, device, deltaX, deltaT, T_in, T_out, id
         Nx = frame_pred.shape[0]
         sensor_xind = np.array([int(x) for x in np.linspace(0, Nx - 1, config['data']['N_sensors'])])
         sensors = deltaX * sensor_xind
-        plot_reconstruction(frame_pred=frame_pred,
+        plot_inspection(frame_pred=frame_pred,
                             frame_true=frame_true,
                             frame_true_noisy=frame_true_noisy,
                             frame_base=frame_base,
@@ -101,7 +101,7 @@ def evaluate_dual(model, loader, config, device, deltaX, deltaT, T_in, T_out, id
                             T_in=T_in,
                             T_out=T_out,
                             scaled_solution=scaled_solution,
-                            fname=f"{dir}/unravel_{max_fcst}_{id}_experiment_{i}",
+                            fname=f"{dir}/unroll_{max_fcst}_{id}_experiment_{i}",
                             score_pred=score_pred,
                             score_base=score_base,
                             score_base_reset=score_base_reset,
@@ -116,19 +116,24 @@ def evaluate_dual(model, loader, config, device, deltaX, deltaT, T_in, T_out, id
     fig.savefig(fname=f"{dir}/{id}_scores")
     print(
         f"Average {eval_name} error in test set: {'{:10.3f}'.format(np.mean(full_scores_pred))}")
-    np.save(f"{dir}/unravel_{max_fcst}_{id}_scores_pred.npy", scores_pred)
-    np.save(f"{dir}/unravel_{max_fcst}_{id}_scores_base.npy", scores_base)
-    np.save(f"{dir}/unravel_{max_fcst}_{id}_full_scores_pred.npy", full_scores_pred)
+    np.save(f"{dir}/unroll_{max_fcst}_{id}_scores_pred.npy", scores_pred)
+    np.save(f"{dir}/unroll_{max_fcst}_{id}_scores_base.npy", scores_base)
+    np.save(f"{dir}/unroll_{max_fcst}_{id}_full_scores_pred.npy", full_scores_pred)
     return
 
 def report_accuracy(model, loaders, config, device, deltaX, deltaT, T_in, T_out, id='test', max_fcst=np.inf):
+    """
+    Evaluate the observers on the test set and produce the following plots in the report
+    - Fig. 8: Robustness of the observers under noise and disturbance.
+    - Fig. 9: Evolution of prediction accuracy over the observation horizon.
+    """
     dir = config['main_dir'] + config['test']['save_dir']
     scores = {}
     loader = loaders["id"]
     std_ys= config['test']['std_ys']
     for std_y in std_ys:
         print(f"ID sigma={std_y} pending...")
-        results = unravel_dual(model=model,
+        results = unroll_observers(model=model,
                                loader=loader,
                                device=device,
                                T_in=T_in,
@@ -158,16 +163,16 @@ def report_accuracy(model, loaders, config, device, deltaX, deltaT, T_in, T_out,
             plot_l2_error_evolution_unformatted(scores_pred, scores_base_reset, scores_base, T_in, T_out, deltaT, fname=f"{dir}/{id}_batch_l2_error_distribution")
             plot_l2_error_evolution_formatted(scores_pred, scores_base_reset, scores_base, T_in, T_out, deltaT, fname=f"{dir}/{id}_batch_l2_error_distribution_formatted")
             
-            np.save(f"{dir}/unravel_{max_fcst}_{id}_scores_pred.npy", scores_pred)
-            np.save(f"{dir}/unravel_{max_fcst}_{id}_scores_base.npy", scores_base)
-            np.save(f"{dir}/unravel_{max_fcst}_{id}_scores_base_reset.npy", scores_base_reset)
-            np.save(f"{dir}/unravel_{max_fcst}_{id}_full_scores_pred.npy", full_scores_pred)
-            np.save(f"{dir}/unravel_{max_fcst}_{id}_full_scores_base.npy", full_scores_base)
-            np.save(f"{dir}/unravel_{max_fcst}_{id}_full_scores_base_reset.npy", full_scores_base_reset)
+            np.save(f"{dir}/unroll_{max_fcst}_{id}_scores_pred.npy", scores_pred)
+            np.save(f"{dir}/unroll_{max_fcst}_{id}_scores_base.npy", scores_base)
+            np.save(f"{dir}/unroll_{max_fcst}_{id}_scores_base_reset.npy", scores_base_reset)
+            np.save(f"{dir}/unroll_{max_fcst}_{id}_full_scores_pred.npy", full_scores_pred)
+            np.save(f"{dir}/unroll_{max_fcst}_{id}_full_scores_base.npy", full_scores_base)
+            np.save(f"{dir}/unroll_{max_fcst}_{id}_full_scores_base_reset.npy", full_scores_base_reset)
 
     for key, l in loaders["ood"].items():
         print(f"OOD {key} pending...")
-        results = unravel_dual(model=model,
+        results = unroll_observers(model=model,
                                loader=l,
                                device=device,
                                T_in=T_in,
@@ -193,8 +198,10 @@ def report_accuracy(model, loaders, config, device, deltaX, deltaT, T_in, T_out,
     plot_accuracy_robustness(df=df, fname=f"{dir}/{id}_batch_accuracy_robustness")
 
 def report_unrolled(model, loader, config, device, deltaX, deltaT, T_in, T_out, id='test', max_fcst=np.inf):
+    """Evaluate the observers on the test set and produce the following plot from the report
+    - Fig. 7: Traffic density estimation with observer variants."""
     dir = config['main_dir'] + config['test']['save_dir']
-    results = unravel_dual(model=model,
+    results = unroll_observers(model=model,
                             loader=loader,
                             device=device,
                             T_in=T_in,
@@ -227,7 +234,7 @@ def report_unrolled(model, loader, config, device, deltaX, deltaT, T_in, T_out, 
             0, Nx - 1, config['data']['N_sensors'])])
         sensors = deltaX * sensor_xind
 
-        plot_unravel_fullstep(frame_true=frame_true,
+        plot_unrolled(frame_true=frame_true,
                     frame_pred=frame_pred,
                     frame_base=frame_base,
                     frame_base_reset=frame_base_reset,
@@ -242,15 +249,17 @@ def report_unrolled(model, loader, config, device, deltaX, deltaT, T_in, T_out, 
                     sensors=sensors)
 
 def report_openloop(model, loader, config, device, deltaX, deltaT, T_in, T_out, id='test'):
+    """Evaluate the observers on the test set and produce the following plot from the report
+    - Fig. 2: Open-loop prediction with solution operator"""
     dir = config['main_dir'] + config['test']['save_dir']
     scaled_solution = config['data']['scaled_solution']
-    results = unravel(model=model, loader=loader, device=device, T_in=T_in, T_out=T_out, max_unravel=1)
+    results = unroll_autoregression(model=model, loader=loader, device=device, T_in=T_in, T_out=T_out, max_unroll=1)
     ypred = results["ypred"]
     ytrue = results["ytrue"]
     for i in range(ypred.shape[0]):
         frame_pred = ypred[i]
         frame_true = ytrue[i]
-        plot_base_io(frame_pred=frame_pred, frame_true=frame_true,
+        plot_pred_io(frame_pred=frame_pred, frame_true=frame_true,
                      deltaX=deltaX, deltaT=deltaT, T_in=T_in, T_out=T_out, 
                      scaled_solution=scaled_solution,
                      fname_params={"dir":dir, "id":id, "i":i})

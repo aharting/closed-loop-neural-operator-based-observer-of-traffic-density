@@ -11,8 +11,8 @@ try:
 except ValueError:
     pass
 from modules.evaluation import report_openloop, report_unrolled, report_accuracy
-from modules.data import gen_data_test, load_config, gpr_bcs
-from modules.fourier import FNN1d, FNN2d, Sequential, Correction
+from modules.data import gen_data_test, load_config
+from modules.fourier import FNN1d, Correction
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -32,7 +32,7 @@ parser.add_argument("--config",
                     required=True)
 parser.add_argument("--max_fcst",
                     type=int,
-                    help="max unravel",
+                    help="max unroll",
                     required=False,
                     default=np.inf)
 

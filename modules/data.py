@@ -36,10 +36,14 @@ def get_fnames(dir):
     return fnames
 
 def gen_data_train(dir, T_in=1, T_out=1, max_dset=None, only_first=False):
+    """
+    Generate training data by splitting each sample into subsequence input-output pairs of length T_in, T_out
+    Return one batch with all slice pairs (this will be shuffled)
+    """
     if max_dset is None:
         max_dset = np.inf
     fnames = get_fnames(dir)
-    print("Loading training data")
+    print("Loading training data...")
     for i in tqdm(range(len(fnames))):
         filename = fnames[i]
         L, Tmax, rho = read_density(filename[:-4])
@@ -68,6 +72,10 @@ def gen_data_train(dir, T_in=1, T_out=1, max_dset=None, only_first=False):
     return Xs, ys, deltaT, deltaX
 
 def gen_data_test(dir, T_in=1, T_out=1, max_dset=None, only_first=False):
+    """
+    Generate test data by splitting each sample into subsequence input-output pairs of length T_in, T_out
+    Return one batch of slice pairs per sample
+    """
     if max_dset is None:
         max_dset = np.inf
     fnames = get_fnames(dir)

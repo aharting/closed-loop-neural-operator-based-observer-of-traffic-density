@@ -14,19 +14,19 @@ import torch
 import numpy as np
 from modules.fourier import FNN1d, FNN2d
 from modules.data import load_config
-from modules.evaluation import evaluate
+from modules.evaluation import inspect_ol
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", 
                     type=str, 
                     help="Base operator config file path", 
                     required=True)
-parser.add_argument("--max_unravel", 
+parser.add_argument("--max_unroll", 
                     type=int, 
-                    help="max unravel", 
+                    help="max unroll", 
                     required=False,
                     default=np.inf)
-def run(config, max_unravel=np.inf):
+def run(config, max_unroll=np.inf):
     if config['train']['device'] is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
@@ -56,11 +56,11 @@ def run(config, max_unravel=np.inf):
     model.load_state_dict(torch.load(config['train']['save_path'], weights_only=True, map_location=device))
     model.eval()
 
-    evaluate(model=model, loader=loader, config=config, device=device, deltaX=deltaX, deltaT=deltaT, T_in=T_in, T_out=T_out, id='test', max_unravel=max_unravel)
+    inspect_ol(model=model, loader=loader, config=config, device=device, deltaX=deltaX, deltaT=deltaT, T_in=T_in, T_out=T_out, id='test', max_unroll=max_unroll)
 
 if __name__ == "__main__":
     args = parser.parse_args()
     config = load_config(args.config)
-    max_unravel = args.max_unravel
-    run(config=config, max_unravel=max_unravel)
+    max_unroll = args.max_unroll
+    run(config=config, max_unroll=max_unroll)
 

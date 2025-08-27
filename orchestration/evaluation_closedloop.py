@@ -11,9 +11,9 @@ except ValueError:
 import argparse
 import torch
 import numpy as np
-from modules.fourier import FNN1d, FNN2d, Sequential, Correction, Dummy
-from modules.data import gen_data_test, load_config, gpr_bcs
-from modules.evaluation import evaluate_dual
+from modules.fourier import FNN1d, Correction
+from modules.data import gen_data_test, load_config
+from modules.evaluation import inspect_observers
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -80,7 +80,7 @@ def run(config, max_fcst=np.inf, gp_error=True):
                         output_activation=config['model']['output_activation']).to(device)
     model.load_state_dict(torch.load(config['train']['save_path'], weights_only=True))
     
-    evaluate_dual(model=model,
+    inspect_observers(model=model,
                   loader=loader, 
                   config=config, 
                   device=device, 

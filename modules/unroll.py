@@ -15,7 +15,7 @@ from imported.losses import LpLoss
 from modules.data import gpr_bcs, gpr_ics
 from tqdm import tqdm
 
-def unravel(model, loader, device, T_in, T_out, myeval_frame=LpLoss(d=2, p=2), max_unravel=np.inf):
+def unroll_autoregression(model, loader, device, T_in, T_out, myeval_frame=LpLoss(d=2, p=2), max_unroll=np.inf):
     """Open-loop unrolling (autoregression)"""
     N = len(loader)
     model.eval()
@@ -30,7 +30,7 @@ def unravel(model, loader, device, T_in, T_out, myeval_frame=LpLoss(d=2, p=2), m
             all_x, all_y = all_x.to(device), all_y.to(device)   
             all_x, all_y = all_x.squeeze(0), all_y.squeeze(0)
             ic = all_x[0]
-            n_unravel = 1
+            n_unroll = 1
             for j in range(all_x.shape[0]):
                 data_x, data_y = all_x[j], all_y[j]
                 if j == 0:
@@ -38,17 +38,17 @@ def unravel(model, loader, device, T_in, T_out, myeval_frame=LpLoss(d=2, p=2), m
                 else:
                     sub_ivl = torch.concat((data_x[:, :-1], data_y), axis=1)
                     frame_true = torch.concat((frame_true, sub_ivl), axis=1)
-                if n_unravel >= max_unravel:
+                if n_unroll >= max_unroll:
                     break
                 else:
-                    n_unravel += 1
+                    n_unroll += 1
             frame_pred = ic[:, :-1]
             while frame_pred.shape[1] + T_out <= frame_true.shape[1]:
                 pred_y = model(ic.unsqueeze(0)).squeeze(0)
                 frame_pred = torch.concat((frame_pred, pred_y), axis=1)
                 ic = torch.concat((pred_y[:, -T_in:], ic[:, [-1]]), axis=1)
             
-            Tmax = min(frame_pred.shape[1], frame_true.shape[1]) # if cap unravel, have mismatch in T
+            Tmax = min(frame_pred.shape[1], frame_true.shape[1]) # if cap unroll, have mismatch in T
             frame_true = frame_true[..., :Tmax]
             frame_pred = frame_pred[..., :Tmax]
             if myeval_frame is not None:
@@ -63,10 +63,11 @@ def unravel(model, loader, device, T_in, T_out, myeval_frame=LpLoss(d=2, p=2), m
         "full_scores_pred":np.array(full_scores_pred)}
     return results
 
-def unravel_frame_true(data, max_unravel):
+def build_true_frame(data, max_unroll):
+    """Build the true density frame from data"""
     all_x, all_y = data
-    n_unravel = 1
-    # Unravel true frame
+    n_unroll = 1
+    # Unroll true frame
     for j in range(all_x.shape[0]):
         data_x, data_y = all_x[j], all_y[j]
         if j == 0:
@@ -74,10 +75,10 @@ def unravel_frame_true(data, max_unravel):
         else:
             sub_ivl = torch.concat((data_x[..., :-1], data_y), axis=1)
             frame_true = torch.concat((frame_true, sub_ivl), axis=1)
-        if n_unravel >= max_unravel:
+        if n_unroll >= max_unroll:
             break
         else:
-            n_unravel += 1
+            n_unroll += 1
     return frame_true
 
 def _first_xic(data, N_sensors, sample, n_samples=0):
@@ -90,7 +91,7 @@ def _first_xic(data, N_sensors, sample, n_samples=0):
     display_xic = torch.mean(display_xic, dim=0) # display_xic[0] to get one sample
     return _xic, first_xic, display_xic
 
-def unravel_frame_base(model, ic_data, frame_true, T_in, T_out, N_sensors, sample, n_samples, myeval, T_fcst=None, max_fcst=np.inf):
+def unroll_ol_observer(model, ic_data, frame_true, T_in, T_out, N_sensors, sample, n_samples, myeval, T_fcst=None, max_fcst=np.inf):
     """
     Unrolls the open-loop observer. 
     The observer is initialized with GP regression, after which autoregression is unrolled in increments of T_fcst.
@@ -135,7 +136,7 @@ def unravel_frame_base(model, ic_data, frame_true, T_in, T_out, N_sensors, sampl
         frame_base = torch.concatenate((frame_base, base_y.squeeze(0)), axis=1)
     return frame_base, score
 
-def unravel_frame_base_reset(model, ic_data, frame_true, T_in, T_out, N_sensors, sample, n_samples, myeval, T_fcst=None, max_fcst=np.inf):
+def unroll_olr_observer(model, ic_data, frame_true, T_in, T_out, N_sensors, sample, n_samples, myeval, T_fcst=None, max_fcst=np.inf):
     """
     Unrolls the open-loop observer with reset. 
     The observer is initialized with GP regression, after which the following applies:
@@ -178,7 +179,7 @@ def unravel_frame_base_reset(model, ic_data, frame_true, T_in, T_out, N_sensors,
         frame_base = torch.concatenate((frame_base, base_y.squeeze(0)), axis=1)
     return frame_base, score
 
-def unravel_frame_uncorrected(model, ic_data, frame_true, T_in, T_out, N_sensors, sample, n_samples, myeval, gp_error, T_fcst=None, max_fcst=np.inf):
+def unroll_cl_observer(model, ic_data, frame_true, T_in, T_out, N_sensors, sample, n_samples, myeval, gp_error, T_fcst=None, max_fcst=np.inf):
     """
     Unrolls the closed-loop observer with reset (main contribution). 
     The observer is initialized with GP regression, after which the following applies:
@@ -240,7 +241,8 @@ def unravel_frame_uncorrected(model, ic_data, frame_true, T_in, T_out, N_sensors
             xbcs = torch.concatenate((xbcs, (torch.mean(xbc, dim=1)).squeeze(0)), axis=1) # display gp
     return frame_pred, xbcs, score
     
-def unravel_dual(model, loader, device, T_in, T_out, N_sensors, myeval_frame=LpLoss(d=2, p=2), myeval_t=LpLoss(d=1, p=2, reduce_dims=None), sample=False, n_samples=1, max_fcst=np.inf, gp_error=True, std_y=0):
+def unroll_observers(model, loader, device, T_in, T_out, N_sensors, myeval_frame=LpLoss(d=2, p=2), myeval_t=LpLoss(d=1, p=2, reduce_dims=None), sample=False, n_samples=1, max_fcst=np.inf, gp_error=True, std_y=0):
+    """Unrolls the observers"""
     model.eval()
     model.ic_model.eval()
     ypred= []
@@ -256,9 +258,9 @@ def unravel_dual(model, loader, device, T_in, T_out, N_sensors, myeval_frame=LpL
     full_scores_base = []
     full_scores_base_reset = []
     if max_fcst == np.inf:
-        max_unravel = np.inf
+        max_unroll = np.inf
     else:
-        max_unravel = np.ceil(max_fcst / T_out) * T_out
+        max_unroll = np.ceil(max_fcst / T_out) * T_out
     assert T_in <= T_out
     with torch.no_grad():
         print("Unrolling observers for each sample...")
@@ -267,26 +269,26 @@ def unravel_dual(model, loader, device, T_in, T_out, N_sensors, myeval_frame=LpL
             all_x, all_y = all_x.to(device), all_y.to(device)   
             all_x, all_y = all_x.squeeze(0), all_y.squeeze(0)
             data = (all_x, all_y)
-            frame_true = unravel_frame_true(data=data, max_unravel=max_unravel)
+            frame_true = build_true_frame(data=data, max_unroll=max_unroll)
             # Perturb data
             all_x = torch.concatenate((
                 torch.clamp(all_x[..., :-1] + std_y*torch.randn_like(all_x[..., :-1]), 0, 1),
                 all_x[..., [-1]]), axis=-1)
             all_y = torch.clamp(all_y + std_y*torch.randn_like(all_y), 0, 1)
             data = (all_x, all_y)
-            frame_true_noisy = unravel_frame_true(data=data, max_unravel=max_unravel)
+            frame_true_noisy = build_true_frame(data=data, max_unroll=max_unroll)
 
             ic_data = _first_xic(data=data, N_sensors=N_sensors, sample=False) #_first_xic(data=data, N_sensors=N_sensors, sample=sample, n_samples=n_samples)
-            frame_base, score = unravel_frame_base(model=model, ic_data=ic_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, N_sensors=N_sensors, sample=sample, n_samples=n_samples, myeval=myeval_t, T_fcst=1, max_fcst=max_fcst) # frame_true is used for score
+            frame_base, score = unroll_ol_observer(model=model, ic_data=ic_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, N_sensors=N_sensors, sample=sample, n_samples=n_samples, myeval=myeval_t, T_fcst=1, max_fcst=max_fcst) # frame_true is used for score
             scores_base.append(score.cpu().numpy())
 
-            frame_base_reset, score = unravel_frame_base_reset(model=model, ic_data=ic_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, N_sensors=N_sensors, sample=sample, n_samples=n_samples, myeval=myeval_t, T_fcst=1, max_fcst=max_fcst) # frame_true is used for ic reset and score
+            frame_base_reset, score = unroll_olr_observer(model=model, ic_data=ic_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, N_sensors=N_sensors, sample=sample, n_samples=n_samples, myeval=myeval_t, T_fcst=1, max_fcst=max_fcst) # frame_true is used for ic reset and score
             scores_base_reset.append(score.cpu().numpy())
             
-            frame_pred, xbcs, score = unravel_frame_uncorrected(model=model, ic_data=ic_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, N_sensors=N_sensors, sample=sample, n_samples=n_samples, myeval=myeval_t, gp_error=gp_error, T_fcst=1, max_fcst=max_fcst) # frame_true is used for correction measurements and score
+            frame_pred, xbcs, score = unroll_cl_observer(model=model, ic_data=ic_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, N_sensors=N_sensors, sample=sample, n_samples=n_samples, myeval=myeval_t, gp_error=gp_error, T_fcst=1, max_fcst=max_fcst) # frame_true is used for correction measurements and score
             scores_pred.append(score.cpu().numpy())
             
-            Tmax = min(frame_pred.shape[1], frame_true.shape[1]) # if cap unravel, have mismatch in T
+            Tmax = min(frame_pred.shape[1], frame_true.shape[1]) # if cap unroll, have mismatch in T
             frame_true = frame_true[..., :Tmax]
             frame_true_noisy = frame_true_noisy[..., :Tmax]
             frame_base = frame_base[..., :Tmax]

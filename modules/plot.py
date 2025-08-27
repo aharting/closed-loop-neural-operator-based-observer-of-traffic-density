@@ -117,7 +117,7 @@ def plot_accuracy_robustness(df, fname):
     plt.savefig(fname=fname)
     default_rcParams()
 
-def plot_reconstruction(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_solution, fname, frame_true_noisy=None, xbcs=None, frame_base=None, frame_base_reset=None, score_pred=None, score_base=None, score_base_reset=None, sensors=[], gp_error=True):
+def plot_inspection(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_solution, fname, frame_true_noisy=None, xbcs=None, frame_base=None, frame_base_reset=None, score_pred=None, score_base=None, score_base_reset=None, sensors=[], gp_error=True):
     total_rows = 2 + (frame_base is not None) * 1 + (frame_base_reset is not None) * 1 
     total_columns = 3
     if scaled_solution == True:
@@ -342,7 +342,7 @@ def plot_reconstruction(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, sca
         plt.close()
     return
 
-def plot_unravel_fullstep(frame_true, frame_pred, frame_base, frame_base_reset, score_pred, score_base, score_base_reset, deltaX, deltaT, T_in, scaled_solution, fname=None, sensors=[]):
+def plot_unrolled(frame_true, frame_pred, frame_base, frame_base_reset, score_pred, score_base, score_base_reset, deltaX, deltaT, T_in, scaled_solution, fname=None, sensors=[]):
     total_rows = 2
     total_columns = 2
     if scaled_solution == True:
@@ -420,7 +420,7 @@ def plot_unravel_fullstep(frame_true, frame_pred, frame_base, frame_base_reset, 
         fig.savefig(fname=f"{fname}_l2_error.png", format="png")
         plt.close()
 
-def plot_base_io(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_solution, figscale=None, fname_params=None):
+def plot_pred_io(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_solution, figscale=None, fname_params=None):
     if fname_params is not None:
         dir, exp_id, i = fname_params["dir"], fname_params["id"], fname_params["i"]
     if scaled_solution == True:
