@@ -9,17 +9,16 @@ try:
     sys.path.remove(str(parent))
 except ValueError:
     pass
-#plt.rcParams["text.usetex"] = True
-#plt.rcParams.update({'font.size': 13})
+plt.rcParams["text.usetex"] = True
+plt.rcParams.update({'font.size': 18})
 
 def idx(row, column, total_rows=1):
     if total_rows == 1:
         return column
     return (row, column)
 
-def plot_reconstruction(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_solution, fname, frame_true_noisy=None, xbcs=None, frame_base=None, frame_base_reset=None, frame_corrected=None, score_pred=None, score_base=None, score_base_reset=None, score_corrected=None, sensors=[], gp_error=True):
-    total_rows = 2 + (frame_base is not None) * 1 + \
-        (frame_base_reset is not None) * 1 + (frame_corrected is not None) * 1
+def plot_reconstruction(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_solution, fname, frame_true_noisy=None, xbcs=None, frame_base=None, frame_base_reset=None, score_pred=None, score_base=None, score_base_reset=None, sensors=[], gp_error=True):
+    total_rows = 2 + (frame_base is not None) * 1 + (frame_base_reset is not None) * 1 
     total_columns = 3
     if scaled_solution == True:
         vmin, vmax = 0, 1
@@ -112,7 +111,7 @@ def plot_reconstruction(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, sca
     fig.colorbar(im, ax=axs[i])
     axs[i].set_xlabel(r'$t$')
     axs[i].set_ylabel(r'$x$')
-    axs[i].set_title(r'Predicted $\hat{\rho}(x,t)$')
+    axs[i].set_title(r'Closed-loop observer, $\hat{\rho}(x,t)$')
     axs[i].axvline(x=deltaT * T_in, c="red")
     if (frame_pred.shape[1] - T_in) / T_out <= 5:
         tvline = T_in + T_out
@@ -156,7 +155,7 @@ def plot_reconstruction(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, sca
         fig.colorbar(im, ax=axs[i])
         axs[i].set_xlabel(r'$t$')
         axs[i].set_ylabel(r'$x$')
-        axs[i].set_title(r'Base predicted $\hat{\rho}(x,t)$')
+        axs[i].set_title(r'Open-loop observer, $\hat{\rho}(x,t)$')
         j += 1
         i = idx(r, j, total_rows)
         _t, _x = np.meshgrid(t, x)
@@ -166,7 +165,6 @@ def plot_reconstruction(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, sca
         axs[i].set_xlabel(r'$t$')
         axs[i].set_ylabel(r'$x$')
         axs[i].set_title('Absolute error base')
-
         j += 1
     else:
         i = idx(r, j, total_rows)
@@ -174,6 +172,7 @@ def plot_reconstruction(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, sca
         j += 1
         i = idx(r, j, total_rows)
         axs[i].set_axis_off()
+
     if score_base is not None:
         i = idx(r, j, total_rows)
         axs[i].plot(np.arange(T_in, T_in + len(score_base))
@@ -200,7 +199,7 @@ def plot_reconstruction(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, sca
         fig.colorbar(im, ax=axs[i])
         axs[i].set_xlabel(r'$t$')
         axs[i].set_ylabel(r'$x$')
-        axs[i].set_title(r'Base w/ reset predicted $\hat{\rho}(x,t)$')        
+        axs[i].set_title(r'Open-loop observer with reset, $\hat{\rho}(x,t)$')        
         axs[i].axvline(x=deltaT * T_in, c="red")    
         if (frame_pred.shape[1] - T_in) / T_out <= 5:
             tvline = T_in + T_out
@@ -236,60 +235,7 @@ def plot_reconstruction(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, sca
         i = idx(r, j, total_rows)
         axs[i].set_axis_off()
         j += 1
-
-    if r == total_rows - 1:
-        fig.tight_layout()
-        if fname is not None:
-            fig.savefig(fname=fname)
-            plt.close()
-        return
-    j = 0
-    r += 1
-    if frame_corrected is not None:
-        i = idx(r, j, total_rows)
-        rho = frame_corrected
-        im = axs[i].pcolor(_t, _x, rho, cmap="rainbow", vmin=vmin, vmax=vmax)
-        fig.colorbar(im, ax=axs[i])
-        axs[i].set_xlabel(r'$t$')
-        axs[i].set_ylabel(r'$x$')
-        axs[i].set_title(r'Corrected prediction of $\hat{\rho}(x,t)$')        
-        axs[i].axvline(x=deltaT * T_in, c="red")    
-        if (frame_pred.shape[1] - T_in) / T_out <= 5:
-            tvline = T_in + T_out
-            while tvline < frame_pred.shape[1]:
-                axs[i].axvline(x=deltaT * tvline, c="red")
-                tvline += T_out
-        j += 1
-        i = idx(r, j, total_rows)
-        _t, _x = np.meshgrid(t, x)
-        rho = np.abs(frame_true - frame_corrected)
-        im = axs[i].pcolor(_t, _x, rho, cmap="jet")
-        fig.colorbar(im, ax=axs[i])
-        axs[i].set_xlabel(r'$t$')
-        axs[i].set_ylabel(r'$x$')
-        axs[i].set_title('Absolute error corrected')
-        for sensor in sensors:
-            axs[i].axhline(y=sensor, c="black")
-
-        j += 1
-    else:
-        i = idx(r, j, total_rows)
-        axs[i].set_axis_off()
-        j += 1
-        i = idx(r, j, total_rows)
-        axs[i].set_axis_off()
-    if score_corrected is not None:
-        i = idx(r, j, total_rows)
-        axs[i].plot(np.arange(T_in, T_in + len(score_corrected))
-                    * deltaT, score_corrected)
-        axs[i].set_xlabel(r't')
-        axs[i].set_title('L2 error')
-        j += 1
-    else:
-        i = idx(r, j, total_rows)
-        axs[i].set_axis_off()
-        j += 1
-
+    
     fig.tight_layout()
     if fname is not None:
         fig.savefig(fname=fname)
@@ -316,8 +262,8 @@ def plot_unravel_fullstep(frame_true, frame_pred, frame_base, frame_base_reset, 
     i = idx(r, j, total_rows)
     im = axs[i].pcolor(_t, _x, rho, cmap="rainbow", vmin=vmin, vmax=vmax)
     #fig.colorbar(im, ax=axs[i])
-    axs[i].set_xlabel(r'$t$')
-    axs[i].set_ylabel(r'$x$')
+    axs[i].set_xlabel(r'$t$ [min]')
+    axs[i].set_ylabel(r'$x$ [km]')
     axs[i].set_title(r'True $\rho(x,t)$')
     #axs[i].axvline(x=deltaT * T_in, c="red")
 
@@ -333,8 +279,8 @@ def plot_unravel_fullstep(frame_true, frame_pred, frame_base, frame_base_reset, 
     rho = frame_base
     im = axs[i].pcolor(_t, _x, rho, cmap="rainbow", vmin=vmin, vmax=vmax)
     fig.colorbar(im, ax=axs[i])
-    axs[i].set_xlabel(r'$t$')
-    axs[i].set_ylabel(r'$x$')
+    axs[i].set_xlabel(r'$t$ [min]')
+    axs[i].set_ylabel(r'$x$ [km]')
     axs[i].set_title(r'Open loop $\hat{\rho}(x,t)$')
 
     j = 0
@@ -343,8 +289,8 @@ def plot_unravel_fullstep(frame_true, frame_pred, frame_base, frame_base_reset, 
     rho = frame_base_reset
     im = axs[i].pcolor(_t, _x, rho, cmap="rainbow", vmin=vmin, vmax=vmax)
     #fig.colorbar(im, ax=axs[i])
-    axs[i].set_xlabel(r'$t$')
-    axs[i].set_ylabel(r'$x$')
+    axs[i].set_xlabel(r'$t$ [min]')
+    axs[i].set_ylabel(r'$x$ [km]')
     axs[i].set_title(r'Open loop with reset $\hat{\rho}(x,t)$')
 
     j += 1
@@ -352,13 +298,13 @@ def plot_unravel_fullstep(frame_true, frame_pred, frame_base, frame_base_reset, 
     rho = frame_pred
     im = axs[i].pcolor(_t, _x, rho, cmap="rainbow", vmin=vmin, vmax=vmax)
     fig.colorbar(im, ax=axs[i])
-    axs[i].set_xlabel(r'$t$')
-    axs[i].set_ylabel(r'$x$')
+    axs[i].set_xlabel(r'$t$ [min]')
+    axs[i].set_ylabel(r'$x$ [km]')
     axs[i].set_title(r'Closed loop $\hat{\rho}(x,t)$')
 
     fig.tight_layout()
     if fname is not None:
-        fig.savefig(fname=fname)
+        fig.savefig(fname=f"{fname}.png", format="png")
 
     fig, ax = plt.subplots()
     ax.plot(np.arange(T_in, T_in + len(score_pred)) * deltaT,
@@ -371,7 +317,7 @@ def plot_unravel_fullstep(frame_true, frame_pred, frame_base, frame_base_reset, 
     ax.set_title(r'$L_2$ error')
     ax.legend()
     if fname is not None:
-        fig.savefig(fname=f"{fname}_l2_error")
+        fig.savefig(fname=f"{fname}_l2_error.png", format="png")
         plt.close()
 
 def plot_base_io(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_solution, figscale=None, fname_params=None):
@@ -400,11 +346,11 @@ def plot_base_io(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_sol
     x_limits = ax.get_xlim()    
     x_domain = x_limits[1] - x_limits[0] 
     current_width, current_height = fig.get_size_inches()
-    current_height *=0.7
+    current_height *=0.8
     fig.set_size_inches(current_width * (x_limits[1] - x_limits[0]) / x_domain, current_height, forward=True)
 
     if fname_params is not None:
-        fig.savefig(fname=f"{dir}/solop_{exp_id}_experiment_{i}_components_output", bbox_inches="tight")
+        fig.savefig(fname=f"{dir}/solop_{exp_id}_experiment_{i}_components_output.svg", bbox_inches="tight", format="svg")
         plt.close()
     
     x = np.linspace(0, deltaX * (frame_true.shape[0] - 1), frame_true.shape[0])
@@ -423,5 +369,5 @@ def plot_base_io(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_sol
     x_limits = ax.get_xlim()
     fig.set_size_inches(current_width * (x_limits[1] - x_limits[0]) / x_domain, current_height, forward=True)
     if fname_params is not None:
-        fig.savefig(fname=f"{dir}/solop_{exp_id}_experiment_{i}_components_input", bbox_inches='tight')
+        fig.savefig(fname=f"{dir}/solop_{exp_id}_experiment_{i}_components_input.svg", bbox_inches='tight', format="svg")
         plt.close()

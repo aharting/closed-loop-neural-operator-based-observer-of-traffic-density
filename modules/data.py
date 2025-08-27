@@ -39,6 +39,7 @@ def gen_data_train(dir, T_in=1, T_out=1, max_dset=None, only_first=False):
     if max_dset is None:
         max_dset = np.inf
     fnames = get_fnames(dir)
+    print("Loading training data")
     for i in tqdm(range(len(fnames))):
         filename = fnames[i]
         L, Tmax, rho = read_density(filename[:-4])
@@ -72,6 +73,7 @@ def gen_data_test(dir, T_in=1, T_out=1, max_dset=None, only_first=False):
     fnames = get_fnames(dir)
     Xss = []
     yss = []
+    print("Loading test data...")
     for i in tqdm(range(len(fnames))):
         filename = fnames[i]
         L, Tmax, rho = read_density(filename[:-4])

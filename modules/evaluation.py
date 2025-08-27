@@ -18,6 +18,9 @@ except ValueError:
 #plt.rcParams.update({'ytick.labelsize': 14, 'xtick.labelsize': 14})       # Y tick font size
 
 def evaluate(model, loader, config, device, deltaX, deltaT, T_in, T_out, id='test', max_unravel=np.inf):
+    """
+    Produces a diagnostic view of open-loop autoregression. One view (image) per sample. 
+    """
     dir = config['main_dir'] + config['test']['save_dir']
     scaled_solution = config['data']['scaled_solution']
     eval_name=r"$L_2$"
@@ -44,6 +47,10 @@ def evaluate(model, loader, config, device, deltaX, deltaT, T_in, T_out, id='tes
 
 
 def evaluate_dual(model, loader, config, device, deltaX, deltaT, T_in, T_out, id='test', max_fcst=np.inf, gp_error=True, std_y=0):
+    """
+    Produces a diagnostic view of observers. One view (image) per sample. 
+    Includes the true and noisy data, the GP regressed measurements, and the three observers (predictions and errors).
+    """
     dir = config['main_dir'] + config['test']['save_dir']
     scaled_solution = config['data']['scaled_solution']
     eval_name = r"$L_2$"
@@ -53,8 +60,7 @@ def evaluate_dual(model, loader, config, device, deltaX, deltaT, T_in, T_out, id
                            T_in=T_in,
                            T_out=T_out,
                            N_sensors=config['data']['N_sensors'],
-                           sample=config['data']['sample'],
-                           n_samples=config['data']['n_samples'],
+                           sample=False,
                            max_fcst=max_fcst,
                            gp_error=gp_error,
                            std_y=std_y)
@@ -64,13 +70,11 @@ def evaluate_dual(model, loader, config, device, deltaX, deltaT, T_in, T_out, id
     ypred = results["ypred"]
     ybase = results["ybase"]
     ybase_reset = results["ybase_reset"]
-    ycorrected = results["ycorrected"]
     bcs = results["bcs"]
     full_scores_pred = results["full_scores_pred"]
     scores_pred = results["scores_pred"]
     scores_base = results["scores_base"]
     scores_base_reset = results["scores_base_reset"]
-    scores_corrected = results["scores_corrected"]
 
     for i in range(ypred.shape[0]):
         frame_pred = ypred[i]
@@ -78,22 +82,18 @@ def evaluate_dual(model, loader, config, device, deltaX, deltaT, T_in, T_out, id
         frame_true_noisy = ytrue_noisy[i]
         frame_base = ybase[i]
         frame_base_reset = ybase_reset[i]
-        frame_corrected = ycorrected[i]
         xbcs = bcs[i]
         score_pred = scores_pred[i]
         score_base = scores_base[i]
         score_base_reset = scores_base_reset[i]
-        score_corrected = scores_corrected[i]
         Nx = frame_pred.shape[0]
-        sensor_xind = np.array([int(x) for x in np.linspace(
-            0, Nx - 1, config['data']['N_sensors'])])
+        sensor_xind = np.array([int(x) for x in np.linspace(0, Nx - 1, config['data']['N_sensors'])])
         sensors = deltaX * sensor_xind
         plot_reconstruction(frame_pred=frame_pred,
                             frame_true=frame_true,
                             frame_true_noisy=frame_true_noisy,
                             frame_base=frame_base,
                             frame_base_reset=frame_base_reset,
-                            frame_corrected=frame_corrected,
                             xbcs=xbcs,
                             deltaX=deltaX,
                             deltaT=deltaT,
@@ -104,7 +104,6 @@ def evaluate_dual(model, loader, config, device, deltaX, deltaT, T_in, T_out, id
                             score_pred=score_pred,
                             score_base=score_base,
                             score_base_reset=score_base_reset,
-                            score_corrected=score_corrected,
                             sensors=sensors,
                             gp_error=gp_error)
     fig, ax = plt.subplots()
@@ -118,8 +117,6 @@ def evaluate_dual(model, loader, config, device, deltaX, deltaT, T_in, T_out, id
         f"Average {eval_name} error in test set: {'{:10.3f}'.format(np.mean(full_scores_pred))}")
     np.save(f"{dir}/unravel_{max_fcst}_{id}_scores_pred.npy", scores_pred)
     np.save(f"{dir}/unravel_{max_fcst}_{id}_scores_base.npy", scores_base)
-    np.save(f"{dir}/unravel_{max_fcst}_{id}_scores_corrected.npy",
-            scores_corrected)
     np.save(f"{dir}/unravel_{max_fcst}_{id}_full_scores_pred.npy", full_scores_pred)
     return
 
@@ -150,11 +147,6 @@ def report_accuracy(model, loaders, config, device, deltaX, deltaT, T_in, T_out,
         scores[fr"$\sigma={std_y}$"]["Open loop"] = full_scores_base
     
         if std_y == 0:
-            scaled_solution = config['data']['scaled_solution']
-            ytrue = results["ytrue"]
-            ypred = results["ypred"]
-            ybase = results["ybase"]
-            ybase_reset = results["ybase_reset"]
             full_scores_pred = results["full_scores_pred"]
             full_scores_base = results["full_scores_base"]
             full_scores_base_reset = results["full_scores_base_reset"]
@@ -245,8 +237,6 @@ def report_accuracy(model, loaders, config, device, deltaX, deltaT, T_in, T_out,
 
 def report_unrolled(model, loader, config, device, deltaX, deltaT, T_in, T_out, id='test', max_fcst=np.inf):
     dir = config['main_dir'] + config['test']['save_dir']
-    eval_name = r"$L_2$ error"
-    scores = {}
     results = unravel_dual(model=model,
                             loader=loader,
                             device=device,

@@ -50,9 +50,6 @@ def run(config, max_fcst=np.inf, gp_error=True):
     T_in = config['data']['T_in']
     T_out = config['data']['T_out']
     max_dset = config['data']['max_dset']
-    only_first = config['data']['only_first']
-    N_sensors = config['data']['N_sensors']
-    sample = config['data']['sample']
     std_y = config['data']['std_y']
     
     test_data_dir = config["data"]["test_data_dir"]
