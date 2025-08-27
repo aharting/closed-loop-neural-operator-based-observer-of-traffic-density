@@ -25,31 +25,31 @@ def idx(row, column, total_rows=1):
         return column
     return (row, column)
 
-def plot_test_scores(full_scores_pred, fname):
+def plot_test_scores(frame_scores, fname):
     fig, ax = plt.subplots()
-    ax.scatter(np.arange(full_scores_pred.shape[0]), full_scores_pred)
+    ax.scatter(np.arange(frame_scores.shape[0]), frame_scores)
     ax.set_xlabel("Test example")
     ax.set_ylabel("Score")
     fig.suptitle(
-        f"Average relative L2 error in test set{'{:10.3f}'.format(np.mean(full_scores_pred))}")
+        f"Average relative L2 error in test set{'{:10.3f}'.format(np.mean(frame_scores))}")
     fig.savefig(fname=fname)
 
-def plot_l2_error_evolution_unformatted(scores_pred, scores_base_reset, scores_base, T_in, T_out, deltaT, fname):
+def plot_l2_error_evolution_unformatted(scores_cl, scores_olr, scores_ol, T_in, T_out, deltaT, fname):
     fig, ax = plt.subplots()
-    x = np.arange(T_in, T_in + scores_pred.shape[1]) * deltaT
-    anchored=scores_pred
+    x = np.arange(T_in, T_in + scores_cl.shape[1]) * deltaT
+    anchored=scores_cl
     y_std = np.std(anchored, axis=0)
     y_mean = np.mean(anchored, axis=0)
     ax.plot(x, y_mean, label=r'Closed loop')
     #ax.fill_between(x, y_mean - y_std, y_mean + y_std, color='blue', alpha=0.3)
 
-    anchored = scores_base_reset
+    anchored = scores_olr
     y_std = np.std(anchored, axis=0)
     y_mean = np.mean(anchored, axis=0)
     ax.plot(x, y_mean, label=r'Open loop with reset')
     #ax.fill_between(x, y_mean - y_std, y_mean + y_std, color='green', alpha=0.3)
 
-    anchored = scores_base
+    anchored = scores_ol
     y_std = np.std(anchored, axis=0)
     y_mean = np.mean(anchored, axis=0)
     ax.plot(x, y_mean, label=r'Open loop')
@@ -61,29 +61,29 @@ def plot_l2_error_evolution_unformatted(scores_pred, scores_base_reset, scores_b
     fig.tight_layout()
     fig.savefig(fname=fname)
 
-def plot_l2_error_evolution_formatted(scores_pred, scores_base_reset, scores_base, T_in, T_out, deltaT, fname):
+def plot_l2_error_evolution_formatted(scores_cl, scores_olr, scores_ol, T_in, T_out, deltaT, fname):
     plt.rcParams.update({'font.size': 12})
     plt.rcParams.update({'ytick.labelsize': 22, 'xtick.labelsize': 22, 'axes.labelsize': 30},)       # Y tick font size
     k=0
     r=150
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    x = np.arange(T_in + T_out, T_in + T_out + scores_pred.shape[1]) * deltaT
-    anchored=scores_pred
+    x = np.arange(T_in + T_out, T_in + T_out + scores_cl.shape[1]) * deltaT
+    anchored=scores_cl
     #anchored = np.sort(anchored, axis=0)#[k:-k]
     y_mean = np.mean(anchored, axis=0)
     y_rolling = pd.Series(y_mean).rolling(r).mean().to_numpy()
     #ax.plot(x, y_mean, label=r'Closed loop')
     ax.semilogy(x, y_rolling, label=r'Closed loop')
 
-    anchored = scores_base_reset
+    anchored = scores_olr
     #anchored = np.sort(anchored, axis=0)#[k:-k]
     y_mean = np.mean(anchored, axis=0)
     y_rolling = pd.Series(y_mean).rolling(r).mean().to_numpy()
     #ax.plot(x, y_mean, label=r'Open loop with reset')
     ax.semilogy(x, y_rolling, label=r'Open loop with reset', linestyle='--')
 
-    anchored = scores_base
+    anchored = scores_ol
     #anchored = np.sort(anchored, axis=0)#[k:-k]
     y_mean = np.mean(anchored, axis=0)
     y_rolling = pd.Series(y_mean).rolling(r).mean().to_numpy()
@@ -117,8 +117,8 @@ def plot_accuracy_robustness(df, fname):
     plt.savefig(fname=fname)
     default_rcParams()
 
-def plot_inspection(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_solution, fname, frame_true_noisy=None, xbcs=None, frame_base=None, frame_base_reset=None, score_pred=None, score_base=None, score_base_reset=None, sensors=[], gp_error=True):
-    total_rows = 2 + (frame_base is not None) * 1 + (frame_base_reset is not None) * 1 
+def plot_inspection(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_solution, fname, frame_true_noisy=None, xbcs=None, frame_ol=None, frame_olr=None, score_pred=None, score_ol=None, score_olr=None, sensors=[], gp_error=True):
+    total_rows = 2 + (frame_ol is not None) * 1 + (frame_olr is not None) * 1 
     total_columns = 3
     if scaled_solution == True:
         vmin, vmax = 0, 1
@@ -211,7 +211,7 @@ def plot_inspection(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_
     fig.colorbar(im, ax=axs[i])
     axs[i].set_xlabel(r'$t$')
     axs[i].set_ylabel(r'$x$')
-    axs[i].set_title(r'Closed-loop observer, $\hat{\rho}(x,t)$')
+    axs[i].set_title(r'Main observer, $\hat{\rho}(x,t)$')
     axs[i].axvline(x=deltaT * T_in, c="red")
     if (frame_pred.shape[1] - T_in) / T_out <= 5:
         tvline = T_in + T_out
@@ -248,9 +248,9 @@ def plot_inspection(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_
         return
     j = 0
     r += 1
-    if frame_base is not None:
+    if frame_ol is not None:
         i = idx(r, j, total_rows)
-        rho = frame_base
+        rho = frame_ol
         im = axs[i].pcolor(_t, _x, rho, cmap="rainbow", vmin=vmin, vmax=vmax)
         fig.colorbar(im, ax=axs[i])
         axs[i].set_xlabel(r'$t$')
@@ -259,7 +259,7 @@ def plot_inspection(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_
         j += 1
         i = idx(r, j, total_rows)
         _t, _x = np.meshgrid(t, x)
-        rho = np.abs(frame_true - frame_base)
+        rho = np.abs(frame_true - frame_ol)
         im = axs[i].pcolor(_t, _x, rho, cmap="jet")
         fig.colorbar(im, ax=axs[i])
         axs[i].set_xlabel(r'$t$')
@@ -273,10 +273,10 @@ def plot_inspection(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_
         i = idx(r, j, total_rows)
         axs[i].set_axis_off()
 
-    if score_base is not None:
+    if score_ol is not None:
         i = idx(r, j, total_rows)
-        axs[i].plot(np.arange(T_in, T_in + len(score_base))
-                    * deltaT, score_base)
+        axs[i].plot(np.arange(T_in, T_in + len(score_ol))
+                    * deltaT, score_ol)
         axs[i].set_xlabel(r't')
         axs[i].set_title(r'$L_2$ error')
         j += 1
@@ -292,9 +292,9 @@ def plot_inspection(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_
         return
     j = 0
     r += 1
-    if frame_base_reset is not None:
+    if frame_olr is not None:
         i = idx(r, j, total_rows)
-        rho = frame_base_reset
+        rho = frame_olr
         im = axs[i].pcolor(_t, _x, rho, cmap="rainbow", vmin=vmin, vmax=vmax)
         fig.colorbar(im, ax=axs[i])
         axs[i].set_xlabel(r'$t$')
@@ -309,7 +309,7 @@ def plot_inspection(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_
         j += 1
         i = idx(r, j, total_rows)
         _t, _x = np.meshgrid(t, x)
-        rho = np.abs(frame_true - frame_base_reset)
+        rho = np.abs(frame_true - frame_olr)
         im = axs[i].pcolor(_t, _x, rho, cmap="jet")
         fig.colorbar(im, ax=axs[i])
         axs[i].set_xlabel(r'$t$')
@@ -324,10 +324,10 @@ def plot_inspection(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_
         j += 1
         i = idx(r, j, total_rows)
         axs[i].set_axis_off()
-    if score_base_reset is not None:
+    if score_olr is not None:
         i = idx(r, j, total_rows)
-        axs[i].plot(np.arange(T_in, T_in + len(score_base_reset))
-                    * deltaT, score_base_reset)
+        axs[i].plot(np.arange(T_in, T_in + len(score_olr))
+                    * deltaT, score_olr)
         axs[i].set_xlabel(r't')
         axs[i].set_title(r'$L_2$ error')
         j += 1
@@ -342,7 +342,7 @@ def plot_inspection(frame_pred, frame_true, deltaX, deltaT, T_in, T_out, scaled_
         plt.close()
     return
 
-def plot_unrolled(frame_true, frame_pred, frame_base, frame_base_reset, score_pred, score_base, score_base_reset, deltaX, deltaT, T_in, scaled_solution, fname=None, sensors=[]):
+def plot_unrolled(frame_true, frame_cl, frame_ol, frame_olr, score_cl, score_ol, score_olr, deltaX, deltaT, T_in, scaled_solution, fname=None, sensors=[]):
     total_rows = 2
     total_columns = 2
     if scaled_solution == True:
@@ -376,7 +376,7 @@ def plot_unrolled(frame_true, frame_pred, frame_base, frame_base_reset, score_pr
 
     j += 1
     i = idx(r, j, total_rows)
-    rho = frame_base
+    rho = frame_ol
     im = axs[i].pcolor(_t, _x, rho, cmap="rainbow", vmin=vmin, vmax=vmax)
     fig.colorbar(im, ax=axs[i])
     axs[i].set_xlabel(r'$t$ [min]')
@@ -386,7 +386,7 @@ def plot_unrolled(frame_true, frame_pred, frame_base, frame_base_reset, score_pr
     j = 0
     r += 1
     i = idx(r, j, total_rows)
-    rho = frame_base_reset
+    rho = frame_olr
     im = axs[i].pcolor(_t, _x, rho, cmap="rainbow", vmin=vmin, vmax=vmax)
     #fig.colorbar(im, ax=axs[i])
     axs[i].set_xlabel(r'$t$ [min]')
@@ -395,7 +395,7 @@ def plot_unrolled(frame_true, frame_pred, frame_base, frame_base_reset, score_pr
 
     j += 1
     i = idx(r, j, total_rows)
-    rho = frame_pred
+    rho = frame_cl
     im = axs[i].pcolor(_t, _x, rho, cmap="rainbow", vmin=vmin, vmax=vmax)
     fig.colorbar(im, ax=axs[i])
     axs[i].set_xlabel(r'$t$ [min]')
@@ -407,12 +407,12 @@ def plot_unrolled(frame_true, frame_pred, frame_base, frame_base_reset, score_pr
         fig.savefig(fname=f"{fname}.png", format="png")
 
     fig, ax = plt.subplots()
-    ax.plot(np.arange(T_in, T_in + len(score_pred)) * deltaT,
-            score_pred, label="Closed loop", color="blue")
-    ax.plot(np.arange(T_in, T_in + len(score_base)) * deltaT,
-            score_base, label="Open loop", color="red")
-    ax.plot(np.arange(T_in, T_in + len(score_base_reset)) * deltaT,
-            score_base_reset, label="Open loop with reset", color="green")
+    ax.plot(np.arange(T_in, T_in + len(score_cl)) * deltaT,
+            score_cl, label="Closed loop", color="blue")
+    ax.plot(np.arange(T_in, T_in + len(score_ol)) * deltaT,
+            score_ol, label="Open loop", color="red")
+    ax.plot(np.arange(T_in, T_in + len(score_olr)) * deltaT,
+            score_olr, label="Open loop with reset", color="green")
     ax.set_xlabel(r't')
     ax.set_title(r'$L_2$ error')
     ax.legend()
