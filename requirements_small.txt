@@ -1,9 +1,0 @@
-gdown
-matplotlib
-numpy
-pandas
-scikit-learn
-scipy
-seaborn
-tqdm
-PyYAML

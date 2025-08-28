@@ -10,3 +10,4 @@ images_for_inkscape
 *.pdf
 playground.ipynb
 .venv
+*.svg
