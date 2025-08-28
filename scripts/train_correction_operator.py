@@ -10,8 +10,9 @@ except ValueError:
     
 import argparse
 import torch
+import numpy as np
 from modules.models import Prediction, Correction
-from modules.data import gen_data_train, load_config, gpr_ics, gpr_bcs
+from modules.data import gen_data_train, load_config, interpolate
 from modules.train import train
 
 parser = argparse.ArgumentParser()
@@ -60,8 +61,19 @@ def run(config):
     if train_noisy:
         Xs = torch.concatenate((torch.clamp(Xs[..., :-1] + std_y*torch.randn_like(Xs[..., :-1]), 0, 1),Xs[..., [-1]]), axis=-1)
         ys = torch.clamp(ys + std_y*torch.randn_like(ys), 0, 1)
-    Xics, _ = gpr_ics(Xs, N_sensors, sample=sample, n_samples=n_samples, disable=False)
-    Xbcs, _  = gpr_bcs(Xs, ys, N_sensors, sample=sample, n_samples=n_samples, disable=False)
+
+    Nx = Xs.shape[1]
+    sensor_xind = np.array([int(x) for x in np.linspace(0, Nx - 1, N_sensors)])
+    x_grid = Xs[0, :, [-1]]
+
+    sensor_x = x_grid[torch.newaxis, sensor_xind, :]
+    sensor_x = sensor_x.repeat(Xs.shape[0], 1, 1)  
+    
+    sensor_y = Xs[:, sensor_xind, :-1]
+    Xics, _ = interpolate(x_grid, sensor_x, sensor_y, sample=sample, n_samples=1)
+
+    sensor_y = ys[:, sensor_xind, ...]
+    Xbcs, _ = interpolate(x_grid, sensor_x, sensor_y, sample=sample, n_samples=1)
 
     Xics, Xbcs, ys = torch.from_numpy(Xics).float(), torch.from_numpy(Xbcs).float(), ys.float()
 

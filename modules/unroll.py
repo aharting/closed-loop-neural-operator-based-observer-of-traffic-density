@@ -12,7 +12,7 @@ import torch
 import numpy as np
 import copy
 from imported.losses import LpLoss
-from modules.data import gpr_bcs, gpr_ics
+from modules.data import interpolate
 from tqdm import tqdm
 
 def build_true_frame(data, max_unroll):
@@ -33,17 +33,24 @@ def build_true_frame(data, max_unroll):
             n_unroll += 1
     return frame
 
-def _first_xic(data, N_sensors, sample, n_samples=0):
-    all_x, all_y = data
-    # Generate initial condition
-    _xic = all_x[[0]] # deterministic, used to get the x values       
-    first_xic, _ = gpr_ics(_xic.cpu(), N_sensors=N_sensors, sample=sample, n_samples=n_samples)
-    first_xic = torch.tensor(first_xic, device=all_x.device.type, dtype=torch.float)
-    display_xic = first_xic[..., :-1].squeeze(0)
-    display_xic = torch.mean(display_xic, dim=0) # display_xic[0] to get one sample
-    return _xic, first_xic, display_xic
+def gen_initial_data(input, sensor_xind, sample, n_samples=0):
+    """Generates the first input to the observer (always the data-based estimate
+    Output: 
+        - x_grid: shape [Nx, 1]
+        - xic: shape [1, n_samples, Nx, N_rho + 1]
+        - frame: shape [Nx, N_rho]
+    """
+    x_grid = input[:, [-1]]
+    sensor_x = x_grid[sensor_xind].unsqueeze(0)
+    sensor_y = input[sensor_xind, :-1].unsqueeze(0)
 
-def unroll_ol_observer(model, ic_data, frame_true, T_in, T_out, N_sensors, sample, n_samples, myeval, T_fcst=None, max_fcst=np.inf):
+    xic, _ = interpolate(x_grid.cpu(), sensor_x.cpu(), sensor_y.cpu(), sample=sample, n_samples=n_samples)
+    xic = torch.tensor(xic, device=input.device.type, dtype=torch.float)
+    frame = xic[..., :-1].squeeze(0)
+    frame = torch.mean(frame, dim=0) # display_xic[0] to get one sample
+    return x_grid, xic, frame
+
+def unroll_ol_observer(model, initial_data, frame_true, T_in, T_out, sensor_xind, sample, n_samples, myeval, T_fcst=None, max_fcst=np.inf):
     """
     Unrolls the open-loop observer. 
     The observer is initialized with GP regression, after which autoregression is unrolled in increments of T_fcst.
@@ -51,21 +58,26 @@ def unroll_ol_observer(model, ic_data, frame_true, T_in, T_out, N_sensors, sampl
     if T_fcst == None:
         T_fcst = T_out
     # First initial condition
-    _xic, first_xic, display_xic = ic_data
-    frame_ol = display_xic
+    x_grid, xic, frame = initial_data
+    frame_ol = frame
+    
     # The first T_in:T_in + T_out - 1 states are populated with the data-based estimate 
     # (so that starting the autoregression at t=0 works, since first prediction predicts rho at t=T_in+T_out)
     y = frame_true[..., T_in:T_in + T_out - 1].unsqueeze(0)
-    xbc, _ = gpr_bcs(_xic.cpu(), y.cpu(), N_sensors=N_sensors, sample=sample, n_samples=n_samples)
-    xbc = torch.tensor(xbc, device=first_xic.device.type, dtype=torch.float)
+    sensor_x = x_grid[torch.newaxis, sensor_xind, :]
+    sensor_y = y[:, sensor_xind, :]
+    xbc, _ = interpolate(x_grid.cpu(), sensor_x.cpu(), sensor_y.cpu(), sample=sample, n_samples=n_samples)
+    xbc = torch.tensor(xbc, device=model.device, dtype=torch.float)
     pred_y = torch.mean(xbc[..., :-1], dim=1)
+    
     score = myeval(torch.swapaxes(pred_y, 0, -1).squeeze(-1), torch.swapaxes(y, 0, -1).squeeze(-1)) # compute error per time - time along batch dimension, squeeze original batch dimension
     frame_ol = torch.concatenate((frame_ol, pred_y.squeeze(0)), axis=1)
+    
     start_score = copy.deepcopy(score)[0]
     _score = -1
     while frame_ol.shape[1] + T_fcst <= min(frame_true.shape[1], max_fcst + T_in + T_out):
         # If process is unstable, stop the computation
-        if _score > np.inf: # max(6 * start_score, 0.75):
+        if _score > max(6 * start_score, 0.75): # np.inf: # max(6 * start_score, 0.75):
             score = torch.concatenate((score, _score), axis=0)
             mean = torch.mean(pred_y)
             if mean > 0.5:
@@ -76,7 +88,7 @@ def unroll_ol_observer(model, ic_data, frame_true, T_in, T_out, N_sensors, sampl
             continue
         # Recent T_in predictions serve as model input
         xic = frame_ol[..., -(T_out + T_in - T_fcst):-(T_out - T_fcst)].unsqueeze(0)
-        xic = torch.concatenate((xic, _xic[..., [-1]]), axis=-1)
+        xic = torch.concatenate((xic, x_grid.unsqueeze(0)), axis=-1)
         pred_y = model.ic_model(xic)
         # Get the last prediction
         pred_y = pred_y[..., -T_fcst:]
@@ -88,7 +100,7 @@ def unroll_ol_observer(model, ic_data, frame_true, T_in, T_out, N_sensors, sampl
         frame_ol = torch.concatenate((frame_ol, pred_y.squeeze(0)), axis=1)
     return frame_ol, score
 
-def unroll_olr_observer(model, ic_data, frame_true, T_in, T_out, N_sensors, sample, n_samples, myeval, T_fcst=None, max_fcst=np.inf):
+def unroll_olr_observer(model, initial_data, frame_true, T_in, T_out, sensor_xind, sample, n_samples, myeval, T_fcst=None, max_fcst=np.inf):
     """
     Unrolls the open-loop observer with reset. 
     The observer is initialized with GP regression, after which the following applies:
@@ -98,40 +110,45 @@ def unroll_olr_observer(model, ic_data, frame_true, T_in, T_out, N_sensors, samp
     if T_fcst == None:
         T_fcst = T_out
     # First initial condition
-    _xic, first_xic, display_xic = ic_data
-    frame_olr = display_xic
+    x_grid, xic, frame = initial_data
+    frame_olr = frame
+    
     # The first T_in:T_in + T_out - 1 states are populated with the data-based estimate for comparability with the other observers
     y = frame_true[..., T_in:T_in + T_out - 1].unsqueeze(0)
-    xbc, _ = gpr_bcs(_xic.cpu(), y.cpu(), N_sensors=N_sensors, sample=sample, n_samples=n_samples)
-    xbc = torch.tensor(xbc, device=first_xic.device.type, dtype=torch.float)
-    base_y = torch.mean(xbc[..., :-1], dim=1)
-    score = myeval(torch.swapaxes(base_y, 0, -1).squeeze(-1), torch.swapaxes(y, 0, -1).squeeze(-1)) # compute error per time - time along batch dimension, squeeze original batch dimension
-    frame_olr = torch.concatenate((frame_olr, base_y.squeeze(0)), axis=1)
+    sensor_x = x_grid[torch.newaxis, sensor_xind, :]
+    sensor_y = y[:, sensor_xind, :]
+    xbc, _ = interpolate(x_grid.cpu(), sensor_x.cpu(), sensor_y.cpu(), sample=sample, n_samples=n_samples)
+    xbc = torch.tensor(xbc, device=model.device, dtype=torch.float)
+    pred_y = torch.mean(xbc[..., :-1], dim=1)
+    
+    score = myeval(torch.swapaxes(pred_y, 0, -1).squeeze(-1), torch.swapaxes(y, 0, -1).squeeze(-1)) # compute error per time - time along batch dimension, squeeze original batch dimension
+    frame_olr = torch.concatenate((frame_olr, pred_y.squeeze(0)), axis=1)
+    
     start_score = copy.deepcopy(score)[0]
     _score = -1
     while frame_olr.shape[1] + T_fcst <= min(frame_true.shape[1], max_fcst + T_in + T_out):
         # Get data-based estimate of input state through GP regression  
-        xic = frame_true[..., -(T_out + T_in - T_fcst) + frame_olr.shape[1]:-(T_out - T_fcst) + frame_olr.shape[1]].unsqueeze(0)
-        xic = torch.concatenate((xic, _xic[..., [-1]]), axis=-1)
-        xic, _ = gpr_ics(xic.cpu(), N_sensors=N_sensors, sample=False) # 1 or more samples
-        xic = torch.tensor(xic, device=first_xic.device.type, dtype=torch.float)
+        y = frame_true[..., -(T_out + T_in - T_fcst) + frame_olr.shape[1]:-(T_out - T_fcst) + frame_olr.shape[1]].unsqueeze(0)
+        sensor_y = y[:, sensor_xind, :]
+        xic, _ = interpolate(x_grid.cpu(), sensor_x.cpu(), sensor_y.cpu(), sample=False, n_samples=n_samples)
+        xic = torch.tensor(xic, device=model.device, dtype=torch.float)
         # n_samples input samples are passed to the model, output is averaged. 
         unflat_shape = xic.shape[:2]
         xic_flat = xic.flatten(start_dim=0, end_dim=1)
-        base_y = model.ic_model(xic_flat)
-        base_y = torch.unflatten(base_y, dim=0, sizes=unflat_shape)
-        base_y = torch.mean(base_y, dim=1) # mean over samples
+        pred_y = model.ic_model(xic_flat)
+        pred_y = torch.unflatten(pred_y, dim=0, sizes=unflat_shape)
+        pred_y = torch.mean(pred_y, dim=1) # mean over samples
         # Get the last prediction
-        base_y = base_y[..., -T_fcst:]
+        pred_y = pred_y[..., -T_fcst:]
         # Get the corresponding true value and compute the score
         y = frame_true[..., frame_olr.shape[1]:frame_olr.shape[1] + T_fcst].unsqueeze(0)
-        _score = myeval(torch.swapaxes(base_y, 0, -1).squeeze(-1), torch.swapaxes(y, 0, -1).squeeze(-1))
+        _score = myeval(torch.swapaxes(pred_y, 0, -1).squeeze(-1), torch.swapaxes(y, 0, -1).squeeze(-1))
         score = torch.concatenate((score, _score), axis=0)
         # Append the prediction to the frame
-        frame_olr = torch.concatenate((frame_olr, base_y.squeeze(0)), axis=1)
+        frame_olr = torch.concatenate((frame_olr, pred_y.squeeze(0)), axis=1)
     return frame_olr, score
 
-def unroll_cl_observer(model, ic_data, frame_true, T_in, T_out, N_sensors, sample, n_samples, myeval, gp_error, T_fcst=None, max_fcst=np.inf):
+def unroll_cl_observer(model, initial_data, frame_true, T_in, T_out, sensor_xind, sample, n_samples, myeval, gp_error, T_fcst=None, max_fcst=np.inf):
     """
     Unrolls the closed-loop observer with reset (main contribution). 
     The observer is initialized with GP regression, after which the following applies:
@@ -141,20 +158,23 @@ def unroll_cl_observer(model, ic_data, frame_true, T_in, T_out, N_sensors, sampl
     if T_fcst == None:
         T_fcst = T_out
     # First initial condition
-    _xic, first_xic, display_xic = ic_data
-    frame_cl = display_xic # mean of samples
+    x_grid, xic, frame = initial_data
+    frame_cl = frame
     if gp_error:
-        xbcs = display_xic - display_xic
+        xbcs = torch.zeros_like(frame)
     else:
-        xbcs = display_xic
+        xbcs = frame
     # The first T_in:T_in + T_out - 1 states are populated with the data-based estimate 
     # (so that starting the autoregression at t=0 works, since first prediction predicts rho at t=T_in+T_out)
     y = frame_true[..., T_in:T_in + T_out - 1].unsqueeze(0)
-    xbc, _ = gpr_bcs(_xic.cpu(), y.cpu(), N_sensors=N_sensors, sample=sample, n_samples=n_samples)
-    xbc = torch.tensor(xbc, device=first_xic.device.type, dtype=torch.float)
+    sensor_x = x_grid[torch.newaxis, sensor_xind, :]
+    sensor_y = y[:, sensor_xind, :]
+    xbc, _ = interpolate(x_grid.cpu(), sensor_x.cpu(), sensor_y.cpu(), sample=sample, n_samples=n_samples)
+    xbc = torch.tensor(xbc, device=model.device, dtype=torch.float)
     pred_y = torch.mean(xbc[..., :-1], dim=1)
     score = myeval(torch.swapaxes(pred_y, 0, -1).squeeze(-1), torch.swapaxes(y, 0, -1).squeeze(-1))
     frame_cl = torch.concat((frame_cl, pred_y.squeeze(0)), axis=1)
+
     y_hist = frame_true[..., :frame_cl.shape[1]] 
     assert frame_cl.shape == y_hist.shape
     start_score = copy.deepcopy(score)[0]
@@ -163,7 +183,7 @@ def unroll_cl_observer(model, ic_data, frame_true, T_in, T_out, N_sensors, sampl
     while frame_cl.shape[1] + T_fcst <= min(frame_true.shape[1], max_fcst + T_in + T_out):
         # Get the input state as the corrected predictions
         xic = pred_y_corrected[..., :T_in]
-        xic = torch.concatenate((xic, _xic[..., [-1]]), axis=-1)
+        xic = torch.concatenate((xic, x_grid.unsqueeze(0)), axis=-1)
         # Predict
         pred_y = model.ic_model(xic)
         # Get the last prediction
@@ -179,12 +199,13 @@ def unroll_cl_observer(model, ic_data, frame_true, T_in, T_out, N_sensors, sampl
         assert frame_cl.shape == y_hist.shape        
         # Compute corrected frame
         y = y_hist[..., - (T_out + T_in) + T_fcst:-T_in + T_fcst].unsqueeze(0) # correction window
-        xbc, _ = gpr_bcs(_xic.cpu(), y.cpu(), N_sensors=N_sensors, sample=sample, n_samples=n_samples) # data-based estimate
-        xbc = torch.tensor(xbc, device=first_xic.device.type, dtype=torch.float)
-        x1 = frame_cl[..., -(T_out + T_in) + T_fcst:-T_in + T_fcst].unsqueeze(0) # prediction estimate
-        x1 = x1.unsqueeze(1)
-        x1 = x1.repeat((1, sample * n_samples + (1 - sample), 1, 1)) # repeat for n_samples to be compatible with xbcs
-        pred_y_corrected = model(x1=x1, x2=xbc) # output prediction is averaged across input samples in fwd call
+        sensor_y = y[:, sensor_xind, :]
+        xbc, _ = interpolate(x_grid.cpu(), sensor_x.cpu(), sensor_y.cpu(), sample=sample, n_samples=n_samples)
+        xbc = torch.tensor(xbc, device=model.device, dtype=torch.float)
+        xp = frame_cl[..., -(T_out + T_in) + T_fcst:-T_in + T_fcst].unsqueeze(0) # prediction estimate
+        xp = xp.unsqueeze(1)
+        xp = xp.repeat((1, sample * n_samples + (1 - sample), 1, 1)) # repeat for n_samples to be compatible with xbcs
+        pred_y_corrected = model(x1=xp, x2=xbc) # output prediction is averaged across input samples in fwd call
         # Store data-based estimate for visualization
         xbc = xbc[..., -T_out-1:-T_out+T_fcst-1]
         if gp_error:
@@ -221,8 +242,9 @@ def unroll_observers(model, loader, device, T_in, T_out, N_sensors, myeval_frame
             all_x, all_y = all_x.to(device), all_y.to(device)   
             all_x, all_y = all_x.squeeze(0), all_y.squeeze(0)
             data = (all_x, all_y)
+            # Build true frame from slices
             frame_true = build_true_frame(data=data, max_unroll=max_unroll)
-            # Perturb data
+            # Build noisy true frame from slices
             all_x = torch.concatenate((
                 torch.clamp(all_x[..., :-1] + std_y*torch.randn_like(all_x[..., :-1]), 0, 1),
                 all_x[..., [-1]]), axis=-1)
@@ -230,14 +252,18 @@ def unroll_observers(model, loader, device, T_in, T_out, N_sensors, myeval_frame
             data = (all_x, all_y)
             frame_true_noisy = build_true_frame(data=data, max_unroll=max_unroll)
 
-            ic_data = _first_xic(data=data, N_sensors=N_sensors, sample=False) #_first_xic(data=data, N_sensors=N_sensors, sample=sample, n_samples=n_samples)
-            frame_ol, score = unroll_ol_observer(model=model, ic_data=ic_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, N_sensors=N_sensors, sample=sample, n_samples=n_samples, myeval=myeval_t, T_fcst=1, max_fcst=max_fcst) # frame_true is used for score
+            Nx = all_x.shape[1]
+            sensor_xind = np.array([int(x) for x in np.linspace(0, Nx - 1, N_sensors)])
+
+            initial_data = gen_initial_data(input=all_x[0], sensor_xind=sensor_xind, sample=False)
+            
+            frame_ol, score = unroll_ol_observer(model=model, initial_data=initial_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, sensor_xind=sensor_xind, sample=sample, n_samples=n_samples, myeval=myeval_t, T_fcst=1, max_fcst=max_fcst) # frame_true is used for score
             scores_ol.append(score.cpu().numpy())
 
-            frame_olr, score = unroll_olr_observer(model=model, ic_data=ic_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, N_sensors=N_sensors, sample=sample, n_samples=n_samples, myeval=myeval_t, T_fcst=1, max_fcst=max_fcst) # frame_true is used for ic reset and score
+            frame_olr, score = unroll_olr_observer(model=model, initial_data=initial_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, sensor_xind=sensor_xind, sample=sample, n_samples=n_samples, myeval=myeval_t, T_fcst=1, max_fcst=max_fcst) # frame_true is used for ic reset and score
             scores_olr.append(score.cpu().numpy())
             
-            frame_cl, xbcs, score = unroll_cl_observer(model=model, ic_data=ic_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, N_sensors=N_sensors, sample=sample, n_samples=n_samples, myeval=myeval_t, gp_error=gp_error, T_fcst=1, max_fcst=max_fcst) # frame_true is used for correction measurements and score
+            frame_cl, xbcs, score = unroll_cl_observer(model=model, initial_data=initial_data, frame_true=frame_true_noisy, T_in=T_in, T_out=T_out, sensor_xind=sensor_xind, sample=sample, n_samples=n_samples, myeval=myeval_t, gp_error=gp_error, T_fcst=1, max_fcst=max_fcst) # frame_true is used for correction measurements and score
             scores_cl.append(score.cpu().numpy())
             
             Tmax = min(frame_cl.shape[1], frame_true.shape[1]) # if cap unroll, have mismatch in T

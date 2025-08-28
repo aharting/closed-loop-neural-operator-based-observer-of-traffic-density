@@ -29,7 +29,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--config", 
                     type=str, 
                     help="config", 
-                    required=True)
+                    required=False,
+                    default="configs/closedloop.yaml")
 parser.add_argument("--max_fcst", 
                     type=int, 
                     help="max_fcst", 
