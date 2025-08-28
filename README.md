@@ -65,6 +65,11 @@ Please consider citing our work if you find our paper and/or this code useful.
         journal={arXiv preprint arXiv:2504.04873},
         year={2025}
     }
+
+<div style="border:1px solid #ccc; padding:6px; border-radius:6px;">
+[1] Harting, A., Johansson, K. H., & Barreau, M. (2025). Closed-Loop Neural Operator-Based Observer of Traffic Density. arXiv preprint arXiv:2504.04873.
+</div>
+
 # References
 The files under `imported/` contain code from repositories
 
