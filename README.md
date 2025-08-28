@@ -3,12 +3,12 @@
 This repository provides the code and experiments from the paper:
 
 <p align="center"><strong>Closed-Loop Neural Operator-Based Observer of Traffic Density</strong></p>
-<p align="center">Alice Harting^1, Karl Henrik Johansson, and Matthieu Barreau</p>
+<p align="center">Alice Harting<sup>$\dagger$</sup>, Karl Henrik Johansson, and Matthieu Barreau</p>
 <p align="center">KTH Royal Institute of Technology</p>
 
 The paper is published here: [https://arxiv.org/abs/2504.04873](https://arxiv.org/abs/2504.04873)
 
-^1 Corresponding author: aharting@kth.se
+<sup>$\dagger$</sup> Corresponding author: aharting@kth.se
 # Set-up
 ### Install required packages
 `pip install -r requirements.txt`
@@ -34,7 +34,7 @@ The trained models can similarly be downloaded by
 
 This is summarized in `download.sh`.
 # Reproducing the experiments
-To **reproduce the plots from the paper**, make sure the models from the previous step are downloaded according to the instructions, then run:
+To **reproduce the plots from the paper**, make sure the models and the datasets from the previous step are downloaded according to the instructions, then run:
 
 `python scripts/report.py --config configs/report.yaml`
 
