@@ -68,7 +68,7 @@ Please consider citing our work if you find our paper and/or this code useful.
 # References
 The files under `imported/` contain code from repositories
 
-[https://github.com/ziqi-ma/neuraloperator](https://github.com/ziqi-ma/neuraloperator)
+[https://github.com/neuraloperator/neuraloperator](https://github.com/neuraloperator/neuraloperator)
 
 [https://github.com/Plasma-FNO/FNO_Isothermal_Blob](https://github.com/Plasma-FNO/FNO_Isothermal_Blob)
 

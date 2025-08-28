@@ -3,9 +3,7 @@ import math
 
 class LpLoss(object):
     """
-    Imported from
-    https://github.com/ziqi-ma/neuraloperator/blob/main/neuralop/losses/data_losses.py#L71C1-L144C35
-    """
+    Imported from https://github.com/neuraloperator/neuraloperator/blob/main/neuralop/losses/data_losses.py"""
     def __init__(self, d=1, p=2, L=2*math.pi, reduce_dims=0, reductions='sum'):
         super().__init__()
 

@@ -1,6 +1,5 @@
 """
-Imported from
-https://github.com/Plasma-FNO/FNO_Isothermal_Blob/blob/main/FNO.py
+Imported from https://github.com/Plasma-FNO/FNO_Isothermal_Blob/blob/main/FNO.py
 """
 import torch
 import torch.nn as nn
