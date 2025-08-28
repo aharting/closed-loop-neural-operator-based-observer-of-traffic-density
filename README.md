@@ -3,12 +3,12 @@
 This repository provides the code and experiments from the paper:
 
 <p align="center"><strong>Closed-Loop Neural Operator-Based Observer of Traffic Density</strong></p>
-<p align="center">Alice Harting<sup>1</sup>, Karl Henrik Johansson, and Matthieu Barreau</p>
+<p align="center">Alice Harting<sup>$\dagger$</sup>, Karl Henrik Johansson, and Matthieu Barreau</p>
 <p align="center">KTH Royal Institute of Technology</p>
 
 The paper is published here: [https://arxiv.org/abs/2504.04873](https://arxiv.org/abs/2504.04873)
 
-<sup>1</sup> Corresponding author: aharting@kth.se
+<sup>$\dagger$</sup> Corresponding author: aharting@kth.se
 # Set-up
 ### Install required packages
 `pip install -r requirements.txt`
