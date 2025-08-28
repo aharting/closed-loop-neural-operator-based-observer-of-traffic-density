@@ -34,7 +34,7 @@ The trained models can similarly be downloaded by
 
 This is summarized in `download.sh`.
 # Reproducing the experiments
-To **reproduce the plots from the paper**, make sure the models from the previous step are downloaded according to the instructions, then run:
+To **reproduce the plots from the paper**, make sure the models and the datasets from the previous step are downloaded according to the instructions, then run:
 
 `python scripts/report.py --config configs/report.yaml`
 
