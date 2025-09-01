@@ -1,0 +1,13 @@
+# Train (base_seed=0) / test in-distribution (base_seed=123456789)
+<vType id="car" length="5" accel="3.5" decel="2.2" sigma="1.0"/>
+deltaX = 0.05  # in km, more than a vehicle (5m)
+Tmax = 40  # in min
+sigma = 0.01  # in km
+tau = 0.06  # in min
+
+# Test out-of-distribution (base_seed=123456789)
+<vType id="car" length="5" accel="1.5" decel="3" sigma="1.0"/>
+deltaX = 0.05  # in km, more than a vehicle (5m)
+Tmax = 40  # in min
+sigma = 0.01  # in km
+tau = 2  # in min

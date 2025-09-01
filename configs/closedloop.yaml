@@ -1,0 +1,38 @@
+main_dir: ''
+data:
+  name: 'closedloop'
+  train_data_dir: "data/train"
+  test_data_dir: "data/test_minimal"
+  scaled_solution: True
+  T_in: 10
+  T_out: 100
+  max_dset: null
+  only_first: False
+  N_sensors: 6
+  sample: True
+  n_samples: 1 # 10
+  Xs_ys_path: 'data'
+  std_y: 0.05
+  train_noisy: False
+
+model:
+  layers: [16, 24, 32]
+  modes1: [15, 9]
+  modes2: [15, 9]
+  fc_dim: 128
+  activation: gelu
+  output_activation: sigmoid
+  base_model_config: 'configs/openloop.yaml'
+    
+train:
+  device: null
+  batchsize: 20
+  epochs: 500
+  milestones: [100, 200, 300, 400, 500]
+  base_lr: 0.001
+  scheduler_gamma: 0.5
+  fname: 'closedloop.pt'
+  use_tqdm: True
+
+test:
+  save_dir: 'results/closedloop'

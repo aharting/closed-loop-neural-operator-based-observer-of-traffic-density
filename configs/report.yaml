@@ -1,0 +1,31 @@
+main_dir: ''
+data:
+  name: 'report'
+  images_data_dir: "data/test_report"
+  test_data_dir: "data/test" 
+  ood_test_data_dirs: {} #{"OOD":"data/test_ood"}
+  scaled_solution: True
+  T_in: 10
+  T_out: 100
+  max_dset: null
+  only_first: False
+  N_sensors: 6
+  sample: False
+  n_samples: 1 # 10
+
+model:
+  layers: [16, 24, 32]
+  modes1: [15, 9]
+  modes2: [15, 9]
+  fc_dim: 128
+  activation: gelu
+  output_activation: sigmoid
+  base_model_config: 'configs/openloop.yaml'
+    
+train:
+  device: null
+  fname: 'closedloop.pt'
+
+test:
+  std_ys: [0, 0.1]
+  save_dir: 'results/report'
