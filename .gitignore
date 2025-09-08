@@ -6,8 +6,8 @@
 *.pyc
 __pycache__/
 *.csv
-images_for_inkscape
 *.pdf
 playground.ipynb
 .venv
 *.svg
+inkscape
