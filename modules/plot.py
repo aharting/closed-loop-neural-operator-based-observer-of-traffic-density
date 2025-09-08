@@ -549,9 +549,9 @@ def plot_pred_io(
 
     if fname_params is not None:
         fig.savefig(
-            fname=f"{dir}/solop_{exp_id}_experiment_{i}_components_output.svg",
+            fname=f"{dir}/solop_{exp_id}_experiment_{i}_components_output.png",
             bbox_inches="tight",
-            format="svg",
+            format="png",
         )
         plt.close()
 
@@ -576,8 +576,8 @@ def plot_pred_io(
     )
     if fname_params is not None:
         fig.savefig(
-            fname=f"{dir}/solop_{exp_id}_experiment_{i}_components_input.svg",
+            fname=f"{dir}/solop_{exp_id}_experiment_{i}_components_input.png",
             bbox_inches="tight",
-            format="svg",
+            format="png",
         )
         plt.close()
