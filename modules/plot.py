@@ -14,9 +14,12 @@ except ValueError:
     pass
 try:
     plt.rcParams["text.usetex"] = True
+    fig, ax = plt.subplots()
+    ax.set_xlabel(r"$\epsilon$")
+    fig.tight_layout()
 except:
+    plt.rcParams["text.usetex"] = False
     pass
-
 
 def default_rcParams():
     plt.rcdefaults()
