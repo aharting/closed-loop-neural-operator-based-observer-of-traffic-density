@@ -43,6 +43,9 @@ class TripleTensorDataset(torch.utils.data.TensorDataset):
 def run(config):
     directory = Path("models")
     directory.mkdir(parents=True, exist_ok=True)
+    
+    directory = Path(config["test"]["save_dir"])
+    directory.mkdir(parents=True, exist_ok=True)
 
     if config["train"]["device"] is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
